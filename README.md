@@ -7,6 +7,7 @@ A lightweight, fully offline, tablet-optimized personal algorithm knowledge base
 ## ✨ Features
 
 - 📱 **Tablet-Optimized UI**: Features a clean, grid-based home screen for categories and a two-pane split layout (Problem on the left, Solution on the right) for comfortable reading.
+- 🗂️ **Smart Sorting & Navigation**: Automatically sorts algorithms based on numerical prefixes in titles (e.g., "01.", "02."). Built-in **"Next / Prev"** buttons allow rapid flipping between questions within the same category.
 - 📝 **Markdown & Syntax Highlighting**: Fully supports Markdown for formatting, alongside syntax highlighting for multiple programming languages (Python, C++, Java, JS, Go, C).
 - 🖼️ **Direct Image Pasting**: Simply `Ctrl+V` to paste screenshots into the editor! The built-in local server automatically extracts the image, saves it as a physical `.png` file, and inserts the proper Markdown link.
 - 💾 **Zero-Backend & Fully Local**: No databases required. All data is saved as a structured `data.json` file, and images are stored locally in the `public` folder.
