@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1771505511562",
+    "title": "杨辉三角",
+    "category": "动态规划",
+    "difficulty": "简单",
+    "language": "python",
+    "problemText": "给定一个非负整数 numRows，生成「杨辉三角」的前 numRows 行。\n\n在「杨辉三角」中，每个数是它左上方和右上方的数的和。\n![图片](/images/img_177150552267071.png)\n\n示例 1:\n\n输入: numRows = 5\n输出: [[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1]]\n示例 2:\n\n输入: numRows = 1\n输出: [[1]]\n \n\n提示:\n\n1 <= numRows <= 30",
+    "solutionText": "class Solution(object):\n    def generate(self, numRows):\n        \"\"\"\n        :type numRows: int\n        :rtype: List[List[int]]\n        \"\"\"\n        ",
+    "images": {}
+  },
+  {
+    "id": "001_test",
+    "title": "二叉树的层序遍历",
+    "category": "树结构",
+    "difficulty": "中等",
+    "problemText": "给你二叉树的根节点 `root` ，返回其节点值的 **层序遍历**。 （即逐层地，从左到右访问所有节点）。",
+    "solutionText": "使用队列进行广度优先搜索：\n```python\nclass Solution:\n    def levelOrder(self, root: TreeNode) -> List[List[int]]:\n        if not root: return []\n        \n        res = []\n        queue = [root]\n        \n        while queue:\n            level = []\n            for _ in range(len(queue)):\n                node = queue.pop(0)\n                level.append(node.val)\n                if node.left: queue.append(node.left)\n                if node.right: queue.append(node.right)\n            res.append(level)\n            \n        return res\n```"
+  }
+]
