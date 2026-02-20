@@ -1,72 +1,67 @@
 # Let Code in Pad 🚀
 
-A lightweight, fully offline, tablet-optimized personal algorithm knowledge base.
+A lightweight, fully offline, and tablet-optimized personal knowledge base.
 
-**Let Code in Pad** is designed with a specific workflow in mind: **Write on PC, Review on Tablet**. It allows you to seamlessly manage your algorithm questions, code snippets, and study notes using a local-first approach without any complex backend databases.
+**Let Code in Pad (LCP)** is designed with a specific workflow in mind: **Write on PC, Review & Manage on Tablet**. It allows you to seamlessly manage your algorithm questions, interview notes, and even personal diaries using a local-first approach without any complex backend databases.
 
-## ✨ Features
+## ✨ Key Features
 
-- 📱 **Tablet-Optimized UI**: Features a clean, grid-based home screen for categories and a two-pane split layout (Problem on the left, Solution on the right) for comfortable reading.
-- 🗂️ **Smart Sorting & Navigation**: Automatically sorts algorithms based on numerical prefixes in titles (e.g., "01.", "02."). Built-in **"Next / Prev"** buttons allow rapid flipping between questions within the same category.
-- 📝 **Markdown & Syntax Highlighting**: Fully supports Markdown for formatting, alongside syntax highlighting for multiple programming languages (Python, C++, Java, JS, Go, C).
-- 🖼️ **Direct Image Pasting**: Simply `Ctrl+V` to paste screenshots into the editor! The built-in local server automatically extracts the image, saves it as a physical `.png` file, and inserts the proper Markdown link.
-- 💾 **Zero-Backend & Fully Local**: No databases required. All data is saved as a structured `data.json` file, and images are stored locally in the `public` folder.
-- 📦 **One-Click App Export**: Powered by Capacitor, you can easily package the entire web app into a standalone `.apk` file to install on your Android tablet for pure offline reading.
+- 🌌 **Parallel App Spaces**: Double-click your avatar in the User Center to toggle between the **Tech Space** (Algorithms & Interview Notes) and the **Life Space** (Diary & Journal). Keep your work and private life elegantly separated.
+- 💾 **Hybrid Local Storage**: Zero backend required! On PC, a custom Vite middleware writes data directly to `data.json` and physical image files. On tablets, it utilizes IndexedDB for lightning-fast offline persistence.
+- 📤 **Export & Archive**: Pure frontend magic! Export your notes or entire categories to **Markdown** or **High-Definition PDFs**. It asynchronously inlines all local physical images into Base64 to ensure no missing assets during sharing.
+- 📦 **LCP Data Protocol**: Share single items across devices instantly using the standardized LCP JSON format via the system clipboard. Copy on PC, tap "Import" on the tablet!
+- 📱 **Native Tablet UI/UX**:
+  - **Action Menu**: Long-press any card (0.6s) to trigger a beautiful contextual menu (Pin, Edit, Share, Delete).
+  - **Floating Navigation**: Subtle, semi-transparent edge buttons for effortless thumb swiping without interfering with content scrolling.
+  - **Landscape Lock & Safe Area**: Automatically locks in landscape mode on mobile/tablets and perfectly pads around hardware notches.
+- 🎨 **Dynamic Tagging & Trash Bin**: Customize tag colors with a built-in color picker. Deleted items go to a dedicated Trash Bin to prevent accidental data loss.
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: Vue 3 (Composition API), Vite, Tailwind CSS
-- **Markdown Processing**: `markdown-it`, `highlight.js`
-- **Native Packaging**: Capacitor
-- **Local Storage**: Custom Vite middleware for direct physical file system access
+- **Markdown & Text Processing**: `markdown-it`, `highlight.js`, `turndown` (for smart HTML-to-MD pasting)
+- **Native Wrap**: Capacitor (`@capacitor/app`, `@capacitor/clipboard`, `@capacitor/screen-orientation`)
+- **Storage**: `localforage` (IndexedDB) & Custom Node.js File System middleware
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-- Node.js installed on your computer.
+- Node.js installed.
 - Android Studio (if you want to build the Android APK).
 
 ### 2. Installation
-Clone the repository and install dependencies:
 ```bash
-git clone [https://github.com/yourusername/let-code-in-pad.git](https://github.com/yourusername/let-code-in-pad.git)
+git clone https://github.com/h0ll0w-AkuZr0guY/let-code-in-pad.git
 cd let-code-in-pad
 npm install
 ```
 
-### 3. Development & Content Creation (PC Workflow)
+### 3. PC Workflow (Content Creation)
 
-Start the local development server with file-writing permissions:
+Start the local server with physical file-writing permissions:
+
 
 ```bash
 npm run dev
 ```
 
-* Open `http://localhost:5173` in your browser.
-* Click **"+ 新建算法" (+ New Algorithm)** to start writing.
-* Paste images directly into the text areas.
-* Click **"保存至本地" (Save to Local)**. Your changes are instantly written to `public/data.json` and `public/images/`.
+- Open `http://localhost:5173` in your browser.
+- Create items, paste rich-text/images directly, and hit **Save**. Data is instantly written to `public/data.json`.
 
-### 4. Build for Tablet (Android APK Export)
+### 4. Tablet Workflow (Android APK Export)
 
-Once you've added your notes, you can package them into an offline Android app:
 
 ```bash
-# 1. Build the frontend static files
 npm run build
-
-# 2. Sync files to the Capacitor Android project
 npx cap sync
-
-# 3. Open Android Studio to build the APK
 npx cap open android
 ```
 
-In Android Studio, let Gradle sync finish, then go to `Build > Build Bundle(s) / APK(s) > Build APK(s)` to generate your offline app!
+*Build the APK in Android Studio and install it on your tablet for a 100% offline, interactive learning experience!*
 
-## 📂 Project Structure
+## 🔮 Roadmap / Future Plans
 
-* `public/data.json`: The core data file containing all your algorithmic records.
-* `public/images/`: Auto-generated folder storing all pasted images.
-* `src/App.vue`: The main application logic and UI.
-* `vite.config.js`: Contains the custom `local-file-saver` plugin.
+- [ ] **NFC "Tap to Share"**: Utilize NFC to transfer LCP protocol data instantly between phone and tablet without network constraints.
+- [ ] **Cloud Sync (WebDAV/GitHub)**: Optional module to sync your local `data.json` to a personal cloud drive or GitHub Gist.
+- [ ] **Dark Mode & Theming**: Full application dark mode support and custom theme configurations via the User Center.
+- [ ] **Heatmap & Statistics**: GitHub-style contribution heatmaps for your algorithms and daily journaling.
