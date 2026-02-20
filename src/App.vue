@@ -26,7 +26,11 @@
         >
           <div>
             <h3 class="text-xl font-bold text-gray-800 line-clamp-2">{{ item.title }}</h3>
-            <p class="text-sm text-gray-400 mt-2">{{ item.category }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <span v-for="cat in getCategories(item.category)" :key="cat" class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">
+                {{ cat }}
+              </span>
+            </div>
           </div>
           <div class="mt-4 flex justify-between items-center">
             <span :class="['px-3 py-1 text-sm rounded-md font-medium', difficultyColor(item.difficulty)]">
@@ -51,7 +55,7 @@
           <template v-if="isEditing">
             <div class="flex-1 flex space-x-3 border-l-2 border-gray-300 pl-4 items-center">
               <input v-model="editForm.title" placeholder="算法标题(如 01.二叉树)" class="font-bold text-lg bg-white border px-3 py-1 rounded w-1/4 outline-none focus:border-blue-500" />
-              <input v-model="editForm.category" placeholder="分类" class="bg-white border px-3 py-1 rounded w-32 outline-none focus:border-blue-500" />
+              <input v-model="editForm.category" placeholder="分类(用空格或逗号分隔多个)" class="bg-white border px-3 py-1 rounded w-48 outline-none focus:border-blue-500" />
               <select v-model="editForm.difficulty" class="bg-white border px-3 py-1 rounded outline-none focus:border-blue-500">
                 <option value="简单">简单</option>
                 <option value="中等">中等</option>
@@ -119,7 +123,7 @@ import { ref, computed, onMounted } from 'vue';
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/vs2015.css'; 
-import { App as CapApp } from '@capacitor/app'; // 引入 Capacitor 应用模块
+import { App as CapApp } from '@capacitor/app';
 
 // ---------------- Markdown 配置 ----------------
 const md = new MarkdownIt({
@@ -163,7 +167,7 @@ const editForm = ref({
 });
 
 // ---------------- 拖拽分栏逻辑 ----------------
-const leftWidth = ref(50); // 左侧面板默认占比 50%
+const leftWidth = ref(50);
 const isDragging = ref(false);
 
 const startDrag = () => {
@@ -178,10 +182,7 @@ const onDrag = (e) => {
   if (!isDragging.value) return;
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const newWidth = (clientX / window.innerWidth) * 100;
-  // 限制左右两侧最小宽度为 20%
-  if (newWidth > 20 && newWidth < 80) {
-    leftWidth.value = newWidth;
-  }
+  if (newWidth > 20 && newWidth < 80) leftWidth.value = newWidth;
 };
 
 const stopDrag = () => {
@@ -191,7 +192,6 @@ const stopDrag = () => {
   document.removeEventListener('touchmove', onDrag);
   document.removeEventListener('touchend', stopDrag);
 };
-
 
 // ---------------- 数据加载与保存 ----------------
 const loadData = async () => {
@@ -203,16 +203,9 @@ const loadData = async () => {
 
 onMounted(() => {
   loadData();
-
-  // 【核心功能】监听安卓设备的物理返回键
   CapApp.addListener('backButton', ({ canGoBack }) => {
-    if (selectedAlgo.value) {
-      // 如果在题目详情页，则返回列表页
-      goBack();
-    } else {
-      // 如果已经在首页列表，则直接退出应用
-      CapApp.exitApp();
-    }
+    if (selectedAlgo.value) goBack();
+    else CapApp.exitApp();
   });
 });
 
@@ -224,26 +217,33 @@ const saveToDisk = async () => {
       await loadData();
       selectedAlgo.value = algorithms.value.find(a => a.id === editForm.value.id);
       isEditing.value = false;
-    } else {
-      alert("保存到硬盘失败！");
-    }
+    } else alert("保存到硬盘失败！");
   } catch (e) { console.error(e); }
 };
 
-// ---------------- 计算属性与自动排序 ----------------
-const categories = computed(() => ['全部', ...new Set(algorithms.value.map(a => a.category).filter(Boolean))]);
+// ---------------- 【核心新增】：多标签解析逻辑 ----------------
+// 使用正则将字符串按照 空格、英文逗号、中文逗号 拆分为数组
+const getCategories = (catStr) => {
+  if (!catStr) return ['未分类'];
+  const cats = catStr.split(/[\s,，]+/).filter(Boolean);
+  return cats.length > 0 ? cats : ['未分类'];
+};
 
-// 【核心功能】数字前缀自动提取与排序
+// 提取全部分类（去重）
+const categories = computed(() => {
+  const allCats = algorithms.value.flatMap(a => getCategories(a.category));
+  return ['全部', ...new Set(allCats)];
+});
+
+// 列表排序过滤（支持多标签判断）
 const sortedFilteredAlgorithms = computed(() => {
   let list = activeCategory.value === '全部' 
     ? algorithms.value 
-    : algorithms.value.filter(a => a.category === activeCategory.value);
+    : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value)); // 判断拆分后的数组中是否包含当前选中的标签
 
   return list.slice().sort((a, b) => {
-    // 尝试匹配标题开头的数字，例如 "01.二叉树" 提取出 1
     const matchA = a.title.match(/^\d+/);
     const matchB = b.title.match(/^\d+/);
-    // 没有数字的排在最后面
     const numA = matchA ? parseInt(matchA[0], 10) : Number.MAX_SAFE_INTEGER;
     const numB = matchB ? parseInt(matchB[0], 10) : Number.MAX_SAFE_INTEGER;
     
@@ -254,7 +254,7 @@ const sortedFilteredAlgorithms = computed(() => {
 
 const difficultyColor = (diff) => diff === '简单' ? 'bg-green-100 text-green-700' : diff === '中等' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
 
-// ---------------- 翻页逻辑 ----------------
+// ---------------- 翻页与基础交互 ----------------
 const currentIndex = computed(() => {
   if (!selectedAlgo.value) return -1;
   return sortedFilteredAlgorithms.value.findIndex(a => a.id === selectedAlgo.value.id);
@@ -266,7 +266,6 @@ const hasNext = computed(() => currentIndex.value !== -1 && currentIndex.value <
 const goPrev = () => { if (hasPrev.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value - 1]; };
 const goNext = () => { if (hasNext.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value + 1]; };
 
-// ---------------- 基础交互 ----------------
 const goBack = () => { selectedAlgo.value = null; isEditing.value = false; };
 const createNew = () => {
   editForm.value = { id: Date.now().toString(), title: '', category: '', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {} };
@@ -282,7 +281,6 @@ const startEdit = () => {
 
 const saveAlgo = async () => {
   if (!editForm.value.title) return alert("标题不能为空！");
-  if (!editForm.value.category) editForm.value.category = "未分类";
   const index = algorithms.value.findIndex(a => a.id === editForm.value.id);
   if (index >= 0) algorithms.value[index] = editForm.value;
   else algorithms.value.unshift(editForm.value);
@@ -327,10 +325,36 @@ const handleImagePaste = (event, targetField) => {
 </script>
 
 <style>
-/* 强制加上 2rem (约32px) 的基础顶部边距，然后再叠加安全区高度，彻底解决刘海屏拥挤问题 */
+/* 安全区适配 */
 .pt-safe {
   padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
 }
 img { max-width: 100%; border-radius: 8px; margin-top: 1rem; margin-bottom: 1rem; }
 .hljs { border-radius: 8px; padding: 1.5rem; margin-top: 1rem; margin-bottom: 1rem; font-size: 1.1rem;}
+
+/* ================== 终极修复：行内代码块 ================== */
+
+/* 1. 彻底干掉 Tailwind 默认给 inline code 两侧加的恶心反引号 */
+.prose code::before,
+.prose code::after {
+  content: none !important;
+}
+
+/* 2. 强制覆盖左侧（浅色区域）的行内代码样式 */
+.prose code:not(pre code) {
+  background-color: #f1f5f9 !important; /* 浅灰底色 */
+  color: #ef4444 !important; /* 鲜艳的红色字体 */
+  padding: 0.15rem 0.4rem !important;
+  border-radius: 0.3rem !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-weight: 600 !important;
+  font-size: 0.85em !important;
+  word-break: break-word !important;
+}
+
+/* 3. 强制覆盖右侧（深色代码区域）的行内代码样式 */
+.prose-invert code:not(pre code) {
+  background-color: #3f3f46 !important; /* 深灰底色 */
+  color: #fca5a5 !important; /* 柔和的浅红字体 */
+}
 </style>

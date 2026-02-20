@@ -1,20 +1,32 @@
 [
   {
-    "id": "1771505511562",
-    "title": "杨辉三角",
+    "id": "1771555016767",
+    "title": "70. 爬楼梯",
     "category": "动态规划",
     "difficulty": "简单",
     "language": "python",
-    "problemText": "给定一个非负整数 numRows，生成「杨辉三角」的前 numRows 行。\n\n在「杨辉三角」中，每个数是它左上方和右上方的数的和。\n![图片](/images/img_177150552267071.png)\n\n示例 1:\n\n输入: numRows = 5\n输出: [[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1]]\n示例 2:\n\n输入: numRows = 1\n输出: [[1]]\n \n\n提示:\n\n1 <= numRows <= 30",
-    "solutionText": "class Solution(object):\n    def generate(self, numRows):\n        \"\"\"\n        :type numRows: int\n        :rtype: List[List[int]]\n        \"\"\"\n        ",
+    "problemText": "假设你正在爬楼梯。需要 `n` 阶你才能到达楼顶。\n\n每次你可以爬 `1` 或 `2` 个台阶。你有多少种不同的方法可以爬到楼顶呢？\n\n \n\n**示例 1：**\n\n```\n输入：n = 2\n输出：2\n解释：有两种方法可以爬到楼顶。\n1. 1 阶 + 1 阶\n2. 2 阶\n```\n\n**示例 2：**\n\n```\n输入：n = 3\n输出：3\n解释：有三种方法可以爬到楼顶。\n1. 1 阶 + 1 阶 + 1 阶\n2. 1 阶 + 2 阶\n3. 2 阶 + 1 阶\n```\n\n \n\n**提示：**\n\n- `1 <= n <= 45`",
+    "solutionText": "class Solution(object):\n    def climbStairs(self, n):\n        \"\"\"\n        :type n: int\n        :rtype: int\n        \"\"\"\n        # dp[i] = dp[i - 1] + 1 or dp[i - 2] + 2 -> dp[i] = dp[i - 1] + dp[i - 2]\n        dp = [0] * (n + 1)\n        dp[0] = 1; dp[1] = 1\n        for i in range(2, n + 1):\n            dp[i] = dp[i - 1] + dp[i - 2]\n        return dp[n]",
     "images": {}
   },
   {
-    "id": "001_test",
-    "title": "二叉树的层序遍历",
-    "category": "树结构",
+    "id": "1771554340579",
+    "title": "763. 划分字母区间",
+    "category": "贪心 哈希表 字符串 双指针",
     "difficulty": "中等",
-    "problemText": "给你二叉树的根节点 `root` ，返回其节点值的 **层序遍历**。 （即逐层地，从左到右访问所有节点）。",
-    "solutionText": "使用队列进行广度优先搜索：\n```python\nclass Solution:\n    def levelOrder(self, root: TreeNode) -> List[List[int]]:\n        if not root: return []\n        \n        res = []\n        queue = [root]\n        \n        while queue:\n            level = []\n            for _ in range(len(queue)):\n                node = queue.pop(0)\n                level.append(node.val)\n                if node.left: queue.append(node.left)\n                if node.right: queue.append(node.right)\n            res.append(level)\n            \n        return res\n```"
+    "language": "python",
+    "problemText": "给你一个字符串 `s` 。我们要把这个字符串划分为尽可能多的片段，同一字母最多出现在一个片段中。例如，字符串 `\"ababcc\"` 能够被分为 `[\"abab\", \"cc\"]`，但类似 `[\"aba\", \"bcc\"]` 或 `[\"ab\", \"ab\", \"cc\"]` 的划分是非法的。\n\n注意，划分结果需要满足：将所有划分结果按顺序连接，得到的字符串仍然是 `s` 。\n\n返回一个表示每个字符串片段的长度的列表。\n\n \n\n**示例 1：**\n\n```\n输入：s = \"ababcbacadefegdehijhklij\"\n输出：[9,7,8]\n解释：\n划分结果为 \"ababcbaca\"、\"defegde\"、\"hijhklij\" 。\n每个字母最多出现在一个片段中。\n像 \"ababcbacadefegde\", \"hijhklij\" 这样的划分是错误的，因为划分的片段数较少。 \n```\n\n**示例 2：**\n\n```\n输入：s = \"eccbbbbdec\"\n输出：[10]\n```\n\n \n\n**提示：**\n\n- `1 <= s.length <= 500`\n- `s` 仅由小写英文字母组成",
+    "solutionText": "class Solution(object):\n    def partitionLabels(self, s):\n        \"\"\"\n        :type s: str\n        :rtype: List[int]\n        \"\"\"\n        maxIndex = dict()\n        # 记录每个字符的最后位置\n        for i in range(len(s)):\n            maxIndex[s[i]] = i\n        ans = list()\n        start = end = 0  # 当前开始和结束位置\n        # 遍历整个字符串s，寻找合适的解\n        for i in range(len(s)):\n            end = max(maxIndex[s[i]], end)\n            if i == end:  # 当 i 走到序列末尾，说明可以截断\n                ans.append(end - start + 1)\n                start = end + 1\n        return ans\n\n        ",
+    "images": {}
+  },
+  {
+    "id": "1771553236692",
+    "title": "45. 跳跃游戏 II",
+    "category": "贪心 数组 动态规划",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "给定一个长度为 `n` 的 **0 索引**整数数组 `nums`。初始位置在下标 0。\n\n每个元素 `nums[i]` 表示从索引 `i` 向后跳转的最大长度。换句话说，如果你在索引 `i` 处，你可以跳转到任意 `(i + j)` 处：\n\n- `0 <= j <= nums[i]` 且\n- i + j < n\n返回到达 `n - 1` 的最小跳跃次数。测试用例保证可以到达 `n - 1`。\n\n \n\n示例 1:\n\n> 输入: nums = [2,3,1,1,4]\n> 输出: 2\n> 解释: 跳到最后一个位置的最小跳跃数是 2。\n>      从下标为 0 跳到下标为 1 的位置，跳 1 步，然后跳 3 步到达数组的最后一个位置。\n示例 2:\n> 输入: nums = [2,3,0,1,4]\n> 输出: 2\n\n提示:\n- `1 <= nums.length <= 104`\n- `0 <= nums[i] <= 1000`\n- 题目保证可以到达 `n - 1`",
+    "solutionText": "class Solution(object):\n    def jump(self, nums):\n        # i + nums[i] >= len(nums) - 1 --> 判断能否到达\n        # 更新max时移动次数 + 1 --> i + nums[i] >= max count += 1\n        count = 0\n        cur_step = next_step = 0\n        for i in range(len(nums) - 1):\n            next_step = max(next_step, i + nums[i])\n            if i == cur_step:\n                cur_step = next_step\n                count += 1\n        return count\n        \"\"\"\n        :type nums: List[int]\n        :rtype: int\n        \"\"\"",
+    "images": {}
   }
 ]
