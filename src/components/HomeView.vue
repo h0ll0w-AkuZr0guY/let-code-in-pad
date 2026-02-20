@@ -12,6 +12,10 @@
         </div>
 
         <div class="flex space-x-3 shrink-0">
+          <button @click="$emit('importData')" class="bg-white border border-gray-200 text-purple-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-purple-50">
+            📥 导入
+          </button>
+          
           <button @click="$emit('openUserCenter')" class="bg-white border border-gray-200 text-blue-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-blue-50">
             👤 个人中心
           </button>
@@ -102,7 +106,7 @@
 <script setup>
 import { ref } from 'vue';
 const props = defineProps(['categories', 'globalCategories', 'activeCategory', 'activeTypeMode', 'sortedList', 'getCategories', 'difficultyColor', 'customCatColors']);
-const emit = defineEmits(['update:activeCategory', 'update:activeTypeMode', 'select', 'create', 'openMenu', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash', 'openUserCenter']);
+const emit = defineEmits(['update:activeCategory', 'update:activeTypeMode', 'select', 'create', 'openMenu', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash', 'openUserCenter', 'importData']);
 
 const showOrderModal = ref(false);
 const closeOrderModal = () => { showOrderModal.value = false; emit('saveOrder'); };

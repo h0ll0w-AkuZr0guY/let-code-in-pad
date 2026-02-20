@@ -11,6 +11,7 @@
       @select="startView" @create="createNew" @openMenu="openActionMenu"
       @moveCat="moveCategory" @saveOrder="saveToDisk" @updateCatColor="updateCatColor"
       @openTrash="showTrashModal = true" @openUserCenter="showUserCenter = true"
+      @importData="handleImportData"
     />
 
     <div v-else class="h-full flex flex-col bg-white">
@@ -63,7 +64,7 @@
       </div>
     </div>
 
-    <ActionMenuModal :show="showActionMenu" :item="actionItem" @close="showActionMenu = false" @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete" />
+    <ActionMenuModal :show="showActionMenu" :item="actionItem" @close="showActionMenu = false" @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete" @shareData="handleShareData" />
     <TrashModal :show="showTrashModal" :trashList="trashList" @close="showTrashModal = false" @restore="restoreItem" @delete="permanentlyDelete" />
     <UserCenterModal :show="showUserCenter" :algoCount="algoCount" :interviewCount="interviewCount" @close="showUserCenter = false" />
 
@@ -82,6 +83,8 @@
 </template>
 
 <script setup>
+import { Clipboard } from '@capacitor/clipboard';
+import { Share } from '@capacitor/share';
 import { ref, computed, onMounted } from 'vue';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -309,5 +312,83 @@ const saveAlgo = async () => {
   else algorithms.value.unshift(editForm.value);
   extractAndSyncCategories(); 
   await saveToDisk();
+};
+
+// ================== 分享与导入逻辑 (LCP 协议) ==================
+
+// 将单个题目对象，包装为标准的 LCP 协议结构
+const packageToLCP = (item) => {
+  return JSON.stringify({
+    lcp_version: "1.0",
+    type: item.type || "algorithm",
+    metadata: {
+      id: item.id || Date.now().toString(),
+      title: item.title,
+      category: item.category,
+      isPinned: !!item.isPinned,
+    },
+    payload: {
+      difficulty: item.difficulty,
+      language: item.language,
+      problemText: item.problemText,
+      solutionText: item.solutionText
+    },
+    assets: item.images || {}
+  });
+};
+
+// 解析标准 LCP 协议结构回溯为应用内存对象
+const parseLCPToItem = (lcpObj) => {
+  return {
+    id: Date.now().toString(), // 导入时强制生成新ID，防止覆盖老数据
+    type: lcpObj.type || 'algorithm',
+    title: lcpObj.metadata?.title || '未命名导入',
+    category: lcpObj.metadata?.category || '默认分类',
+    isPinned: false, // 导入默认不置顶
+    difficulty: lcpObj.payload?.difficulty || '中等',
+    language: lcpObj.payload?.language || 'python',
+    problemText: lcpObj.payload?.problemText || '',
+    solutionText: lcpObj.payload?.solutionText || '',
+    images: lcpObj.assets || {}
+  };
+};
+
+const handleShareData = async (item) => {
+  const payloadStr = packageToLCP(item);
+  try {
+    // 写入设备剪贴板，未来可以直接替换为调用 NFC API 写芯片
+    await Clipboard.write({ string: payloadStr });
+    showActionMenu.value = false;
+    alert("📦 数据包已复制到剪贴板！可以通过微信发送给朋友或在另一台平板导入。");
+  } catch (e) {
+    console.error("复制失败", e);
+  }
+};
+
+const handleImportData = async () => {
+  try {
+    const { value } = await Clipboard.read();
+    if (!value) return alert("剪贴板为空！");
+    
+    let lcpObj;
+    try {
+      lcpObj = JSON.parse(value);
+    } catch (e) {
+      return alert("剪贴板内容不是有效的 LCP 数据格式。");
+    }
+
+    if (!lcpObj.lcp_version) {
+      return alert("无法识别的版本或数据损坏。");
+    }
+
+    const newItem = parseLCPToItem(lcpObj);
+    algorithms.value.unshift(newItem);
+    extractAndSyncCategories();
+    await saveToDisk();
+    
+    alert(`🎉 成功导入: ${newItem.title}`);
+  } catch (e) {
+    alert("导入失败，请检查剪贴板权限。");
+  }
 };
 </script>
