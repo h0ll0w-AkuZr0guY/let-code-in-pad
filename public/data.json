@@ -1,6 +1,7 @@
 [
   {
     "type": "interview",
+    "isPinned": false,
     "id": "1771573690810",
     "title": "VLLM",
     "category": "面试组件",
@@ -12,6 +13,7 @@
   },
   {
     "type": "algorithm",
+    "isPinned": false,
     "id": "1771555602075",
     "title": "118. 杨辉三角",
     "category": "数组 动态规划",
@@ -23,6 +25,7 @@
   },
   {
     "type": "algorithm",
+    "isPinned": false,
     "id": "1771555016767",
     "title": "70. 爬楼梯",
     "category": "动态规划",
@@ -34,6 +37,7 @@
   },
   {
     "type": "algorithm",
+    "isPinned": false,
     "id": "1771554340579",
     "title": "763. 划分字母区间",
     "category": "贪心 哈希表 字符串 双指针",
@@ -45,6 +49,7 @@
   },
   {
     "type": "algorithm",
+    "isPinned": false,
     "id": "1771553236692",
     "title": "45. 跳跃游戏 II",
     "category": "贪心 数组 动态规划",

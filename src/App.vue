@@ -4,10 +4,9 @@
     <HomeView 
       v-if="!selectedAlgo && !isEditing"
       :categories="categories" :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
-      :getCategories="getCategories" :difficultyColor="difficultyColor"
-      :customCatColors="customCatColors"
+      :getCategories="getCategories" :difficultyColor="difficultyColor" :customCatColors="customCatColors"
       @update:activeCategory="activeCategory = $event"
-      @select="startView" @create="createNew" @requestDelete="triggerDelete"
+      @select="startView" @create="createNew" @openMenu="openActionMenu"
       @moveCat="moveCategory" @saveOrder="saveToDisk" @updateCatColor="updateCatColor"
       @openTrash="showTrashModal = true"
     />
@@ -20,8 +19,7 @@
           <template v-if="isEditing">
             <div class="flex-1 flex space-x-3 border-l-2 border-gray-300 pl-4 items-center">
               <select v-model="editForm.type" class="bg-white border px-3 py-1 rounded outline-none focus:border-blue-500 font-bold text-blue-700">
-                <option value="algorithm">算法题</option>
-                <option value="interview">面经/笔记</option>
+                <option value="algorithm">算法题</option><option value="interview">面经/笔记</option>
               </select>
               <input v-model="editForm.title" placeholder="标题(支持数字前缀排序)" class="font-bold text-lg bg-white border px-3 py-1 rounded w-1/4 outline-none focus:border-blue-500" />
               <input v-model="editForm.category" placeholder="分类(空格或逗号分隔)" class="bg-white border px-3 py-1 rounded w-40 outline-none focus:border-blue-500" />
@@ -35,9 +33,7 @@
                 </select>
               </template>
             </div>
-            <button @click="saveAlgo" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 ml-4 shrink-0">
-              保存
-            </button>
+            <button @click="saveAlgo" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 ml-4 shrink-0">保存</button>
           </template>
 
           <template v-else>
@@ -59,44 +55,30 @@
         </div>
       </div>
 
-      <div class="flex-1 flex overflow-hidden relative" 
-           @touchstart="handleSwipeStart" @touchend="handleSwipeEnd"
-           @mousedown="handleSwipeStart" @mouseup="handleSwipeEnd">
+      <div class="flex-1 flex overflow-hidden relative" @touchstart="handleSwipeStart" @touchend="handleSwipeEnd" @mousedown="handleSwipeStart" @mouseup="handleSwipeEnd">
         <InterviewView v-if="(isEditing ? editForm.type : selectedAlgo.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
         <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
       </div>
     </div>
 
-    <div v-if="showDeleteConfirm" class="absolute inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm transition-opacity">
-      <div class="bg-white p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col transform scale-100">
+    <ActionMenuModal 
+      :show="showActionMenu" :item="actionItem"
+      @close="showActionMenu = false"
+      @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete"
+    />
+    
+    <TrashModal 
+      :show="showTrashModal" :trashList="trashList"
+      @close="showTrashModal = false" @restore="restoreItem" @delete="permanentlyDelete"
+    />
+
+    <div v-if="showDeleteConfirm" class="absolute inset-0 z-[80] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
+      <div class="bg-white p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
         <h3 class="text-xl font-bold text-gray-800 mb-2">移入回收站</h3>
-        <p class="text-gray-500 mb-6">确定要将 <span class="font-bold text-gray-700">"{{ itemToDelete?.title }}"</span> 移入回收站吗？</p>
+        <p class="text-gray-500 mb-6">确定将 <span class="font-bold text-gray-700">"{{ itemToDelete?.title }}"</span> 移入回收站？</p>
         <div class="flex justify-end space-x-3">
           <button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">取消</button>
-          <button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 transition shadow-md">确定移动</button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showTrashModal" class="absolute inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-      <div class="bg-white p-6 rounded-2xl shadow-2xl w-[36rem] max-h-[85%] flex flex-col">
-        <div class="flex justify-between items-center mb-6 border-b pb-3">
-          <h3 class="text-xl font-bold text-gray-800 flex items-center">🗑️ 回收站 <span class="text-sm font-normal text-gray-400 ml-2">({{ trashList.length }} 项)</span></h3>
-          <button @click="showTrashModal = false" class="text-gray-400 hover:text-red-500 font-bold text-2xl leading-none">✕</button>
-        </div>
-        
-        <div class="flex-1 overflow-y-auto space-y-3 pr-2">
-          <div v-if="trashList.length === 0" class="text-center text-gray-400 mt-10">回收站是空的</div>
-          <div v-for="item in trashList" :key="item.id" class="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-            <div class="flex-1 overflow-hidden pr-4">
-              <h4 class="font-bold text-gray-700 truncate">{{ item.title }}</h4>
-              <p class="text-xs text-gray-400 mt-1">{{ item.category }} | {{ item.type === 'interview' ? '面经' : '算法' }}</p>
-            </div>
-            <div class="flex space-x-2 shrink-0">
-              <button @click="restoreItem(item)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold hover:bg-green-200 transition text-sm">恢复</button>
-              <button @click="permanentlyDelete(item)" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold hover:bg-red-200 transition text-sm">彻底删除</button>
-            </div>
-          </div>
+          <button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 transition shadow-md">确定</button>
         </div>
       </div>
     </div>
@@ -113,43 +95,68 @@ import localforage from 'localforage';
 import HomeView from './components/HomeView.vue';
 import AlgoView from './components/AlgoView.vue';
 import InterviewView from './components/InterviewView.vue';
+import ActionMenuModal from './components/ActionMenuModal.vue';
+import TrashModal from './components/TrashModal.vue';
 
 const algorithms = ref([]);
-const trashList = ref([]); // 回收站列表
+const trashList = ref([]); 
 const activeCategory = ref('全部');
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
 const customCatOrder = ref([]); 
 const customCatColors = ref({}); 
-const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {} });
+const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false });
 
-// ================== 删除与回收站状态控制 ==================
+// 模态框状态
 const showDeleteConfirm = ref(false);
 const showTrashModal = ref(false);
 const itemToDelete = ref(null);
+const showActionMenu = ref(false);
+const actionItem = ref(null);
 
-const triggerDelete = (item) => {
-  itemToDelete.value = item;
-  showDeleteConfirm.value = true;
+// ================== 长按菜单操作 ==================
+const openActionMenu = (item) => {
+  actionItem.value = item;
+  showActionMenu.value = true;
 };
 
+const togglePin = async (item) => {
+  const idx = algorithms.value.findIndex(a => a.id === item.id);
+  if (idx !== -1) {
+    algorithms.value[idx].isPinned = !algorithms.value[idx].isPinned;
+    showActionMenu.value = false;
+    await saveToDisk();
+  }
+};
+
+const handleMenuEdit = (item) => {
+  showActionMenu.value = false;
+  selectedAlgo.value = item;
+  startEdit();
+};
+
+const handleMenuDelete = (item) => {
+  showActionMenu.value = false;
+  triggerDelete(item);
+};
+
+// ================== 删除与回收站 ==================
+const triggerDelete = (item) => { itemToDelete.value = item; showDeleteConfirm.value = true; };
 const confirmDelete = async () => {
   const item = itemToDelete.value;
   algorithms.value = algorithms.value.filter(a => a.id !== item.id);
-  trashList.value.unshift(item); // 放入回收站顶部
+  trashList.value.unshift(item); 
   showDeleteConfirm.value = false;
   extractAndSyncCategories();
   await saveToDisk();
   if (selectedAlgo.value?.id === item.id) goBack();
 };
-
 const restoreItem = async (item) => {
   trashList.value = trashList.value.filter(a => a.id !== item.id);
-  algorithms.value.unshift(item); // 恢复到主列表
+  algorithms.value.unshift(item);
   extractAndSyncCategories();
   await saveToDisk();
 };
-
 const permanentlyDelete = async (item) => {
   if (confirm(`彻底删除 "${item.title}" 将无法找回，确认删除？`)) {
     trashList.value = trashList.value.filter(a => a.id !== item.id);
@@ -157,6 +164,7 @@ const permanentlyDelete = async (item) => {
   }
 };
 
+// ================== 数据装载与保存 ==================
 const extractAndSyncCategories = () => {
   const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category)));
   const ordered = customCatOrder.value.filter(c => allCats.has(c));
@@ -176,9 +184,8 @@ const loadData = async () => {
     let dataToUse = null;
     const isNative = Capacitor.isNativePlatform();
     
-    // 【核心】强制设备端强制锁定横屏
     if (isNative) {
-      ScreenOrientation.lock({ orientation: 'landscape' }).catch(e => console.log('锁定横屏失败', e));
+      ScreenOrientation.lock({ orientation: 'landscape' }).catch(() => {});
       const localData = await localforage.getItem('algo-data');
       if (localData && localData.length > 0) dataToUse = localData;
     }
@@ -189,7 +196,7 @@ const loadData = async () => {
     }
 
     if (dataToUse) {
-      algorithms.value = dataToUse.map(item => ({ type: item.type || 'algorithm', ...item }));
+      algorithms.value = dataToUse.map(item => ({ type: item.type || 'algorithm', isPinned: !!item.isPinned, ...item }));
       extractAndSyncCategories();
       await localforage.setItem('algo-data', algorithms.value); 
     }
@@ -199,16 +206,14 @@ const loadData = async () => {
 const saveToDisk = async () => {
   try {
     const pureData = JSON.parse(JSON.stringify(algorithms.value));
-    
     await localforage.setItem('algo-data', pureData);
-    await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value))); // 保存回收站
+    await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value)));
     await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value)));
     await localforage.setItem('cat-colors', JSON.parse(JSON.stringify(customCatColors.value)));
 
     if (!Capacitor.isNativePlatform()) {
       await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {});
     }
-
     if (isEditing.value) {
       selectedAlgo.value = algorithms.value.find(a => a.id === editForm.value.id);
       isEditing.value = false;
@@ -216,15 +221,13 @@ const saveToDisk = async () => {
   } catch (e) { console.error(e); }
 };
 
-const updateCatColor = async (cat, color) => {
-  customCatColors.value[cat] = color;
-  await saveToDisk();
-};
+const updateCatColor = async (cat, color) => { customCatColors.value[cat] = color; await saveToDisk(); };
 
 onMounted(() => {
   loadData();
   CapApp.addListener('backButton', () => {
-    if (showDeleteConfirm.value) showDeleteConfirm.value = false;
+    if (showActionMenu.value) showActionMenu.value = false;
+    else if (showDeleteConfirm.value) showDeleteConfirm.value = false;
     else if (showTrashModal.value) showTrashModal.value = false;
     else if (selectedAlgo.value || isEditing.value) goBack(); 
     else CapApp.exitApp();
@@ -247,7 +250,6 @@ const getCategories = (catStr) => {
 };
 
 const categories = computed(() => ['全部', ...customCatOrder.value]);
-
 const moveCategory = (index, direction) => {
   const targetIndex = index + direction;
   if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return;
@@ -256,9 +258,13 @@ const moveCategory = (index, direction) => {
   customCatOrder.value[targetIndex] = temp;
 };
 
+// 【核心排序修改】：加入了 isPinned 属性的判断逻辑
 const sortedFilteredAlgorithms = computed(() => {
   let list = activeCategory.value === '全部' ? algorithms.value : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value));
   return list.slice().sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
     const numA = a.title.match(/^\d+/) ? parseInt(a.title.match(/^\d+/)[0], 10) : Number.MAX_SAFE_INTEGER;
     const numB = b.title.match(/^\d+/) ? parseInt(b.title.match(/^\d+/)[0], 10) : Number.MAX_SAFE_INTEGER;
     if (numA !== numB) return numA - numB;
@@ -277,7 +283,7 @@ const goBack = () => { selectedAlgo.value = null; isEditing.value = false; };
 const startView = (item) => { selectedAlgo.value = item; isEditing.value = false; };
 
 const createNew = () => {
-  editForm.value = { id: Date.now().toString(), title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {} };
+  editForm.value = { id: Date.now().toString(), title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false };
   selectedAlgo.value = null;
   isEditing.value = true;
 };

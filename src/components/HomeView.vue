@@ -36,6 +36,10 @@
           class="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl cursor-pointer transition flex flex-col justify-between min-h-[11rem] h-full group relative border-t-4 select-none"
           :class="item.type === 'interview' ? 'border-purple-400' : 'border-blue-400'"
         >
+          <div v-if="item.isPinned" class="absolute -top-4 -right-3 text-3xl drop-shadow-md z-10 rotate-12">
+            📌
+          </div>
+
           <div>
             <div class="flex justify-between items-start mb-2">
               <h3 class="text-xl font-bold text-gray-800 line-clamp-2 flex-1">{{ item.title }}</h3>
@@ -53,12 +57,10 @@
             <span v-if="item.type !== 'interview'" :class="['px-3 py-1 text-sm rounded-md font-medium', difficultyColor(item.difficulty)]">
               {{ item.difficulty }}
             </span>
-            </div>
+          </div>
         </div>
       </div>
-      <div v-if="sortedList.length === 0" class="text-center text-gray-400 mt-20 text-lg">
-        当前分类下没有内容，点击右上角新建一个吧！
-      </div>
+      <div v-if="sortedList.length === 0" class="text-center text-gray-400 mt-20 text-lg">当前分类下没有内容，点击右上角新建一个吧！</div>
     </div>
 
     <div v-if="showOrderModal" class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 rounded-xl backdrop-blur-sm">
@@ -89,33 +91,25 @@
 <script setup>
 import { ref } from 'vue';
 const props = defineProps(['categories', 'activeCategory', 'sortedList', 'getCategories', 'difficultyColor', 'customCatColors']);
-const emit = defineEmits(['update:activeCategory', 'select', 'create', 'requestDelete', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash']);
+const emit = defineEmits(['update:activeCategory', 'select', 'create', 'openMenu', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash']);
 
 const showOrderModal = ref(false);
 const closeOrderModal = () => { showOrderModal.value = false; emit('saveOrder'); };
 
-// ================== 长按删除核心逻辑 ==================
 let pressTimer = null;
 let isLongPress = false;
 
 const startPress = (item) => {
   isLongPress = false;
   pressTimer = setTimeout(() => {
-    isLongPress = true; // 标记触发了长按
-    emit('requestDelete', item); // 呼出删除弹窗
-  }, 600); // 600毫秒触发长按
+    isLongPress = true;
+    emit('openMenu', item); // 长按呼出功能菜单
+  }, 600); 
 };
 
-const cancelPress = () => {
-  if (pressTimer) clearTimeout(pressTimer);
-};
+const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
+const handleClick = (item) => { if (!isLongPress) emit('select', item); };
 
-const handleClick = (item) => {
-  // 只有在没有触发长按的情况下，才当作正常的点击进入题目
-  if (!isLongPress) emit('select', item);
-};
-
-// 色彩计算
 const getNavStyle = (cat, isActive) => {
   const color = props.customCatColors[cat];
   if (isActive) return { backgroundColor: color || '#2563eb', color: '#ffffff', border: `1px solid ${color || '#2563eb'}` };
