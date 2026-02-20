@@ -96,7 +96,7 @@
         <div class="flex flex-col bg-white" :style="{ width: leftWidth + '%' }">
           <h2 class="text-sm font-bold text-gray-400 tracking-widest uppercase p-4 border-b shrink-0 bg-gray-50">题目描述</h2>
           <div class="p-6 flex-1 overflow-y-auto">
-            <textarea v-if="isEditing" v-model="editForm.problemText" @paste="(e) => handleImagePaste(e, 'problemText')" placeholder="支持 Markdown 语法。Ctrl+V 粘贴截图..." class="w-full h-full resize-none outline-none text-lg p-2 border-2 border-dashed border-gray-200 rounded-lg focus:border-blue-400 focus:bg-blue-50 transition"></textarea>
+            <textarea v-if="isEditing" v-model="editForm.problemText" @paste="(e) => handleSmartPaste(e, 'problemText')" placeholder="支持 Markdown 语法。Ctrl+V 粘贴截图..." class="w-full h-full resize-none outline-none text-lg p-2 border-2 border-dashed border-gray-200 rounded-lg focus:border-blue-400 focus:bg-blue-50 transition"></textarea>
             <div v-else class="prose max-w-none text-lg" v-html="renderMarkdown(selectedAlgo.problemText, selectedAlgo.images)"></div>
           </div>
         </div>
@@ -109,7 +109,7 @@
             <span v-if="!isEditing" class="text-xs bg-gray-600 text-gray-300 px-2 py-1 rounded">{{ selectedAlgo.language || 'python' }}</span>
           </h2>
           <div class="p-6 flex-1 overflow-y-auto">
-            <textarea v-if="isEditing" v-model="editForm.solutionText" @paste="(e) => handleImagePaste(e, 'solutionText')" placeholder="直接粘贴纯代码（会自动按顶部语言高亮），或书写 Markdown..." class="w-full h-full resize-none outline-none text-lg p-2 bg-transparent text-gray-200 font-mono border-2 border-dashed border-gray-600 rounded-lg focus:border-blue-400"></textarea>
+            <textarea v-if="isEditing" v-model="editForm.solutionText" @paste="(e) => handleSmartPaste(e, 'solutionText')" placeholder="直接粘贴纯代码（会自动按顶部语言高亮），或书写 Markdown..." class="w-full h-full resize-none outline-none text-lg p-2 bg-transparent text-gray-200 font-mono border-2 border-dashed border-gray-600 rounded-lg focus:border-blue-400"></textarea>
             <div v-else class="prose prose-invert max-w-none text-lg" v-html="renderSolution(selectedAlgo)"></div>
           </div>
         </div>
@@ -124,8 +124,9 @@ import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/vs2015.css'; 
 import { App as CapApp } from '@capacitor/app';
+import TurndownService from 'turndown'; // 【新增】引入富文本转 Markdown 神器
 
-// ---------------- Markdown 配置 ----------------
+// ---------------- Markdown 渲染与转换配置 ----------------
 const md = new MarkdownIt({
   html: true,
   breaks: true,
@@ -154,6 +155,13 @@ const renderSolution = (item) => {
   }
   return renderMarkdown(text, item.images);
 };
+
+// 【新增】配置 Turndown 转换规则
+const turndownService = new TurndownService({
+  headingStyle: 'atx', // 使用 # 作为标题
+  codeBlockStyle: 'fenced', // 使用 ``` 作为代码块
+  emDelimiter: '*' // 使用 * 作为斜体
+});
 
 // ---------------- 状态管理 ----------------
 const algorithms = ref([]);
@@ -221,32 +229,28 @@ const saveToDisk = async () => {
   } catch (e) { console.error(e); }
 };
 
-// ---------------- 【核心新增】：多标签解析逻辑 ----------------
-// 使用正则将字符串按照 空格、英文逗号、中文逗号 拆分为数组
+// ---------------- 多标签解析与过滤 ----------------
 const getCategories = (catStr) => {
   if (!catStr) return ['未分类'];
   const cats = catStr.split(/[\s,，]+/).filter(Boolean);
   return cats.length > 0 ? cats : ['未分类'];
 };
 
-// 提取全部分类（去重）
 const categories = computed(() => {
   const allCats = algorithms.value.flatMap(a => getCategories(a.category));
   return ['全部', ...new Set(allCats)];
 });
 
-// 列表排序过滤（支持多标签判断）
 const sortedFilteredAlgorithms = computed(() => {
   let list = activeCategory.value === '全部' 
     ? algorithms.value 
-    : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value)); // 判断拆分后的数组中是否包含当前选中的标签
+    : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value));
 
   return list.slice().sort((a, b) => {
     const matchA = a.title.match(/^\d+/);
     const matchB = b.title.match(/^\d+/);
     const numA = matchA ? parseInt(matchA[0], 10) : Number.MAX_SAFE_INTEGER;
     const numB = matchB ? parseInt(matchB[0], 10) : Number.MAX_SAFE_INTEGER;
-    
     if (numA !== numB) return numA - numB;
     return a.title.localeCompare(b.title);
   });
@@ -265,7 +269,6 @@ const hasNext = computed(() => currentIndex.value !== -1 && currentIndex.value <
 
 const goPrev = () => { if (hasPrev.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value - 1]; };
 const goNext = () => { if (hasNext.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value + 1]; };
-
 const goBack = () => { selectedAlgo.value = null; isEditing.value = false; };
 const createNew = () => {
   editForm.value = { id: Date.now().toString(), title: '', category: '', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {} };
@@ -278,7 +281,6 @@ const startEdit = () => {
   if (!editForm.value.language) editForm.value.language = 'python';
   isEditing.value = true;
 };
-
 const saveAlgo = async () => {
   if (!editForm.value.title) return alert("标题不能为空！");
   const index = algorithms.value.findIndex(a => a.id === editForm.value.id);
@@ -286,16 +288,32 @@ const saveAlgo = async () => {
   else algorithms.value.unshift(editForm.value);
   await saveToDisk();
 };
-
 const deleteAlgo = async (id) => {
-  if (!confirm("确定删除？（本地硬盘文件 data.json 也将被更新）")) return;
+  if (!confirm("确定删除？")) return;
   algorithms.value = algorithms.value.filter(a => a.id !== id);
   await saveToDisk();
   if (selectedAlgo.value?.id === id) goBack();
 };
 
-const handleImagePaste = (event, targetField) => {
-  const items = event.clipboardData.items;
+// ---------------- 【核心】：辅助文本插入函数 ----------------
+const insertTextAtCursor = (textarea, targetField, insertText) => {
+  const startPos = textarea.selectionStart;
+  const endPos = textarea.selectionEnd;
+  const text = editForm.value[targetField] || '';
+  editForm.value[targetField] = text.substring(0, startPos) + insertText + text.substring(endPos);
+  setTimeout(() => {
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = startPos + insertText.length;
+  }, 10);
+};
+
+// ---------------- 【核心重构】：智能粘贴处理 ----------------
+const handleSmartPaste = (event, targetField) => {
+  const clipboardData = event.clipboardData || window.clipboardData;
+  if (!clipboardData) return;
+
+  // 1. 优先检测并处理图片
+  const items = clipboardData.items;
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.indexOf('image') !== -1) {
       event.preventDefault();
@@ -307,19 +325,27 @@ const handleImagePaste = (event, targetField) => {
         if (!editForm.value.images) editForm.value.images = {};
         editForm.value.images[imgId] = base64Str;
         const imgMarkdown = `\n![图片](local:${imgId})\n`;
-        const textarea = event.target;
-        const startPos = textarea.selectionStart;
-        const endPos = textarea.selectionEnd;
-        const text = editForm.value[targetField];
-        editForm.value[targetField] = text.substring(0, startPos) + imgMarkdown + text.substring(endPos);
-        setTimeout(() => {
-          textarea.focus();
-          textarea.selectionStart = textarea.selectionEnd = startPos + imgMarkdown.length;
-        }, 10);
+        insertTextAtCursor(event.target, targetField, imgMarkdown);
       };
       reader.readAsDataURL(blob);
-      break;
+      return; // 图片处理完毕，直接退出
     }
+  }
+
+  // 2. 检测是否存在富文本(HTML)
+  const htmlData = clipboardData.getData('text/html');
+  const plainText = clipboardData.getData('text/plain');
+
+  // 智能拦截条件：只有左侧“题目描述”框，且剪贴板含有 HTML，并且纯文本中不包含显著的代码/Markdown特征时，才启用自动转换
+  // （避免右侧粘贴 VS Code 高亮代码时发生误伤）
+  if (htmlData && targetField === 'problemText' && !plainText.match(/(```|##|\[.*\]\(.*\))/)) {
+    event.preventDefault();
+    let markdown = turndownService.turndown(htmlData);
+    
+    // 修复部分网页表格或多重 div 导致的冗余空行
+    markdown = markdown.replace(/\n{3,}/g, '\n\n');
+    
+    insertTextAtCursor(event.target, targetField, markdown);
   }
 };
 </script>

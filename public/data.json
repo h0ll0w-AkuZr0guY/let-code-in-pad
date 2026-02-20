@@ -1,5 +1,15 @@
 [
   {
+    "id": "1771555602075",
+    "title": "118. 杨辉三角",
+    "category": "数组 动态规划",
+    "difficulty": "简单",
+    "language": "python",
+    "problemText": "给定一个非负整数 *`numRows`*，生成「杨辉三角」的前 *`numRows`* 行。\n\n在「**杨辉三角**」中，每个数是它左上方和右上方的数的和。\n\n\n![图片](/images/img_177155562723371.png)\n\n**示例 1:**\n\n```\n输入: numRows = 5\n输出: [[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1]]\n```\n\n**示例 2:**\n\n```\n输入: numRows = 1\n输出: [[1]]\n```\n\n \n\n**提示:**\n\n- `1 <= numRows <= 30`",
+    "solutionText": "class Solution(object):\n    def generate(self, numRows):\n        a = []\n        for i in range(numRows):\n            if i == 0:\n                a.append([1])\n            else:\n                row = [1] * (i + 1)\n                for j in range(1, i):\n                    row[j] = a[i - 1][j - 1] + a[i - 1][j]\n                a.append(row)\n        return a\n        \"\"\"\n        :type numRows: int\n        :rtype: List[List[int]]\n        \"\"\"",
+    "images": {}
+  },
+  {
     "id": "1771555016767",
     "title": "70. 爬楼梯",
     "category": "动态规划",
