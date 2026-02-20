@@ -3,12 +3,14 @@
     
     <HomeView 
       v-if="!selectedAlgo && !isEditing"
-      :categories="categories" :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
+      :activeTypeMode="activeTypeMode" @update:activeTypeMode="handleModeChange"
+      :categories="activeModeCategories" :globalCategories="customCatOrder" 
+      :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
       :getCategories="getCategories" :difficultyColor="difficultyColor" :customCatColors="customCatColors"
       @update:activeCategory="activeCategory = $event"
       @select="startView" @create="createNew" @openMenu="openActionMenu"
       @moveCat="moveCategory" @saveOrder="saveToDisk" @updateCatColor="updateCatColor"
-      @openTrash="showTrashModal = true"
+      @openTrash="showTrashModal = true" @openUserCenter="showUserCenter = true"
     />
 
     <div v-else class="h-full flex flex-col bg-white">
@@ -61,16 +63,9 @@
       </div>
     </div>
 
-    <ActionMenuModal 
-      :show="showActionMenu" :item="actionItem"
-      @close="showActionMenu = false"
-      @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete"
-    />
-    
-    <TrashModal 
-      :show="showTrashModal" :trashList="trashList"
-      @close="showTrashModal = false" @restore="restoreItem" @delete="permanentlyDelete"
-    />
+    <ActionMenuModal :show="showActionMenu" :item="actionItem" @close="showActionMenu = false" @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete" />
+    <TrashModal :show="showTrashModal" :trashList="trashList" @close="showTrashModal = false" @restore="restoreItem" @delete="permanentlyDelete" />
+    <UserCenterModal :show="showUserCenter" :algoCount="algoCount" :interviewCount="interviewCount" @close="showUserCenter = false" />
 
     <div v-if="showDeleteConfirm" class="absolute inset-0 z-[80] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
       <div class="bg-white p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
@@ -97,10 +92,12 @@ import AlgoView from './components/AlgoView.vue';
 import InterviewView from './components/InterviewView.vue';
 import ActionMenuModal from './components/ActionMenuModal.vue';
 import TrashModal from './components/TrashModal.vue';
+import UserCenterModal from './components/UserCenterModal.vue'; // 新增导入
 
 const algorithms = ref([]);
 const trashList = ref([]); 
 const activeCategory = ref('全部');
+const activeTypeMode = ref('all'); // 【新增】视图模式控制：all, algorithm, interview
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
 const customCatOrder = ref([]); 
@@ -110,16 +107,22 @@ const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', diffi
 // 模态框状态
 const showDeleteConfirm = ref(false);
 const showTrashModal = ref(false);
+const showUserCenter = ref(false); // 【新增】个人中心控制
 const itemToDelete = ref(null);
 const showActionMenu = ref(false);
 const actionItem = ref(null);
 
-// ================== 长按菜单操作 ==================
-const openActionMenu = (item) => {
-  actionItem.value = item;
-  showActionMenu.value = true;
+// ================== 数据统计与切换逻辑 ==================
+const algoCount = computed(() => algorithms.value.filter(a => a.type === 'algorithm').length);
+const interviewCount = computed(() => algorithms.value.filter(a => a.type === 'interview').length);
+
+const handleModeChange = (mode) => {
+  activeTypeMode.value = mode;
+  activeCategory.value = '全部'; // 切换大类时，重置标签过滤
 };
 
+// ================== 长按菜单操作 ==================
+const openActionMenu = (item) => { actionItem.value = item; showActionMenu.value = true; };
 const togglePin = async (item) => {
   const idx = algorithms.value.findIndex(a => a.id === item.id);
   if (idx !== -1) {
@@ -128,17 +131,8 @@ const togglePin = async (item) => {
     await saveToDisk();
   }
 };
-
-const handleMenuEdit = (item) => {
-  showActionMenu.value = false;
-  selectedAlgo.value = item;
-  startEdit();
-};
-
-const handleMenuDelete = (item) => {
-  showActionMenu.value = false;
-  triggerDelete(item);
-};
+const handleMenuEdit = (item) => { showActionMenu.value = false; selectedAlgo.value = item; startEdit(); };
+const handleMenuDelete = (item) => { showActionMenu.value = false; triggerDelete(item); };
 
 // ================== 删除与回收站 ==================
 const triggerDelete = (item) => { itemToDelete.value = item; showDeleteConfirm.value = true; };
@@ -165,6 +159,12 @@ const permanentlyDelete = async (item) => {
 };
 
 // ================== 数据装载与保存 ==================
+const getCategories = (catStr) => {
+  if (!catStr) return ['未分类'];
+  const cats = catStr.split(/[\s,，]+/).filter(Boolean);
+  return cats.length > 0 ? cats : ['未分类'];
+};
+
 const extractAndSyncCategories = () => {
   const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category)));
   const ordered = customCatOrder.value.filter(c => allCats.has(c));
@@ -226,7 +226,8 @@ const updateCatColor = async (cat, color) => { customCatColors.value[cat] = colo
 onMounted(() => {
   loadData();
   CapApp.addListener('backButton', () => {
-    if (showActionMenu.value) showActionMenu.value = false;
+    if (showUserCenter.value) showUserCenter.value = false;
+    else if (showActionMenu.value) showActionMenu.value = false;
     else if (showDeleteConfirm.value) showDeleteConfirm.value = false;
     else if (showTrashModal.value) showTrashModal.value = false;
     else if (selectedAlgo.value || isEditing.value) goBack(); 
@@ -243,13 +244,6 @@ const handleSwipeEnd = (e) => {
   if (endX - startX > 80 && hasPrev.value) goPrev();
 };
 
-const getCategories = (catStr) => {
-  if (!catStr) return ['未分类'];
-  const cats = catStr.split(/[\s,，]+/).filter(Boolean);
-  return cats.length > 0 ? cats : ['未分类'];
-};
-
-const categories = computed(() => ['全部', ...customCatOrder.value]);
 const moveCategory = (index, direction) => {
   const targetIndex = index + direction;
   if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return;
@@ -258,9 +252,24 @@ const moveCategory = (index, direction) => {
   customCatOrder.value[targetIndex] = temp;
 };
 
-// 【核心排序修改】：加入了 isPinned 属性的判断逻辑
+// 【核心逻辑】：只展示存在于当前 Mode 下的标签，保持标签区极度纯净
+const activeModeCategories = computed(() => {
+  let listForCats = algorithms.value;
+  if (activeTypeMode.value !== 'all') {
+    listForCats = algorithms.value.filter(a => a.type === activeTypeMode.value);
+  }
+  const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category)));
+  const displayCats = customCatOrder.value.filter(c => currentModeCats.has(c));
+  return ['全部', ...displayCats];
+});
+
+// 【核心逻辑】：综合 模式过滤、标签过滤、置顶排序、数字前缀排序
 const sortedFilteredAlgorithms = computed(() => {
-  let list = activeCategory.value === '全部' ? algorithms.value : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value));
+  let list = algorithms.value;
+  
+  if (activeTypeMode.value !== 'all') list = list.filter(a => a.type === activeTypeMode.value);
+  if (activeCategory.value !== '全部') list = list.filter(a => getCategories(a.category).includes(activeCategory.value));
+  
   return list.slice().sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
