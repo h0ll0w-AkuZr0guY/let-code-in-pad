@@ -1,5 +1,17 @@
 [
   {
+    "type": "interview",
+    "id": "1771573690810",
+    "title": "VLLM",
+    "category": "面试组件",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "vllm\n\n推理加速：内存优化、并行计算、调度策略\n\n内存优化：pageattention：将KV分块，按需分配（allocate_blocks（ceil（current_sequence_length / block_size）））\n\n显存占用大概减少4倍\n\n连续批处理：实时监控请求状态，动态合并正在处理的请求。迭代级调度：每生成一个token重新调整批次；抢占式推理：优先处理低延迟要求的请求\n\n内存池：预先申请大块内存块，循环复用内存块\n\n\n\n案例：一开始使用huggingface pipeline吞吐量较低，且长期占用GPU资源，平均延迟较高。\n\n8台h800 qwen-72B实际只跑满了不到3台90%利用率，同时能支持用户数量提高，且体验也有所好转",
+    "solutionText": "",
+    "images": {}
+  },
+  {
+    "type": "algorithm",
     "id": "1771555602075",
     "title": "118. 杨辉三角",
     "category": "数组 动态规划",
@@ -10,6 +22,7 @@
     "images": {}
   },
   {
+    "type": "algorithm",
     "id": "1771555016767",
     "title": "70. 爬楼梯",
     "category": "动态规划",
@@ -20,6 +33,7 @@
     "images": {}
   },
   {
+    "type": "algorithm",
     "id": "1771554340579",
     "title": "763. 划分字母区间",
     "category": "贪心 哈希表 字符串 双指针",
@@ -30,6 +44,7 @@
     "images": {}
   },
   {
+    "type": "algorithm",
     "id": "1771553236692",
     "title": "45. 跳跃游戏 II",
     "category": "贪心 数组 动态规划",
