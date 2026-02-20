@@ -1,0 +1,13 @@
+[
+  {
+    "id": "1700000000000",
+    "title": "01. 我的第一个模板",
+    "category": "默认分类",
+    "type": "interview",
+    "difficulty": "简单",
+    "language": "python",
+    "problemText": "### 欢迎使用 Let Code in Pad\n\n这是一个笔记和面试题的默认模板。你可以在这里使用 **Markdown** 语法，或者直接从网页上 `Ctrl+V` 粘贴图文并茂的富文本！\n\n- 支持自动提取图片\n- 支持多端数据保存\n- 支持代码自动高亮",
+    "solutionText": "",
+    "images": {}
+  }
+]

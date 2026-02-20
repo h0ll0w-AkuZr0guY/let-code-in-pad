@@ -3,15 +3,11 @@
     
     <HomeView 
       v-if="!selectedAlgo && !isEditing"
-      :categories="categories"
-      :activeCategory="activeCategory"
-      :sortedList="sortedFilteredAlgorithms"
-      :getCategories="getCategories"
-      :difficultyColor="difficultyColor"
+      :categories="categories" :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
+      :getCategories="getCategories" :difficultyColor="difficultyColor"
       @update:activeCategory="activeCategory = $event"
-      @select="startView"
-      @create="createNew"
-      @delete="deleteAlgo"
+      @select="startView" @create="createNew" @delete="deleteAlgo"
+      @moveCat="moveCategory" @saveOrder="saveToDisk"
     />
 
     <div v-else class="h-full flex flex-col bg-white">
@@ -27,23 +23,19 @@
               </select>
               <input v-model="editForm.title" placeholder="标题(支持数字前缀排序)" class="font-bold text-lg bg-white border px-3 py-1 rounded w-1/4 outline-none focus:border-blue-500" />
               <input v-model="editForm.category" placeholder="分类(空格或逗号分隔)" class="bg-white border px-3 py-1 rounded w-40 outline-none focus:border-blue-500" />
-              
               <template v-if="editForm.type !== 'interview'">
                 <select v-model="editForm.difficulty" class="bg-white border px-3 py-1 rounded outline-none focus:border-blue-500">
-                  <option value="简单">简单</option>
-                  <option value="中等">中等</option>
-                  <option value="困难">困难</option>
+                  <option value="简单">简单</option><option value="中等">中等</option><option value="困难">困难</option>
                 </select>
                 <select v-model="editForm.language" class="bg-white border px-3 py-1 rounded outline-none focus:border-blue-500">
-                  <option value="python">Python</option>
-                  <option value="cpp">C++</option>
-                  <option value="java">Java</option>
-                  <option value="javascript">JS</option>
-                  <option value="go">Go</option>
+                  <option value="python">Python</option><option value="cpp">C++</option><option value="java">Java</option>
+                  <option value="javascript">JS</option><option value="go">Go</option>
                 </select>
               </template>
             </div>
-            <button @click="saveAlgo" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 ml-4 shrink-0">保存至本地</button>
+            <button @click="saveAlgo" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 ml-4 shrink-0">
+              保存
+            </button>
           </template>
 
           <template v-else>
@@ -53,8 +45,8 @@
               </span>
               <h1 class="text-2xl font-bold truncate">{{ selectedAlgo.title }}</h1>
               <div class="flex space-x-2 shrink-0">
-                <button @click="goPrev" :disabled="!hasPrev" :class="{'opacity-30 cursor-not-allowed': !hasPrev}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300 transition">&lt; 上一题</button>
-                <button @click="goNext" :disabled="!hasNext" :class="{'opacity-30 cursor-not-allowed': !hasNext}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300 transition">下一题 &gt;</button>
+                <button @click="goPrev" :disabled="!hasPrev" :class="{'opacity-30 cursor-not-allowed': !hasPrev}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300 transition">&lt;</button>
+                <button @click="goNext" :disabled="!hasNext" :class="{'opacity-30 cursor-not-allowed': !hasNext}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300 transition">&gt;</button>
               </div>
             </div>
             <div class="flex space-x-4 shrink-0">
@@ -65,8 +57,12 @@
         </div>
       </div>
 
-      <InterviewView v-if="(isEditing ? editForm.type : selectedAlgo.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
-      <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
+      <div class="flex-1 flex overflow-hidden relative" 
+           @touchstart="handleSwipeStart" @touchend="handleSwipeEnd"
+           @mousedown="handleSwipeStart" @mouseup="handleSwipeEnd">
+        <InterviewView v-if="(isEditing ? editForm.type : selectedAlgo.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
+        <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
+      </div>
       
     </div>
   </div>
@@ -75,57 +71,114 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import localforage from 'localforage';
 import HomeView from './components/HomeView.vue';
 import AlgoView from './components/AlgoView.vue';
 import InterviewView from './components/InterviewView.vue';
 
-// 状态
 const algorithms = ref([]);
 const activeCategory = ref('全部');
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
+const customCatOrder = ref([]); 
 const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {} });
 
-// 数据持久化
+// ================== 核心修复 1：严格区分存储环境 ==================
+const extractAndSyncCategories = () => {
+  const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category)));
+  const ordered = customCatOrder.value.filter(c => allCats.has(c));
+  const unordered = Array.from(allCats).filter(c => !ordered.includes(c));
+  customCatOrder.value = [...ordered, ...unordered];
+};
+
 const loadData = async () => {
   try {
-    const res = await fetch('/data.json?t=' + Date.now());
-    if (res.ok) {
-      let data = await res.json();
-      // 兼容老数据：如果没有 type 属性，默认为 'algorithm'
-      algorithms.value = data.map(item => ({ type: 'algorithm', ...item }));
+    const savedOrder = await localforage.getItem('cat-order');
+    if (savedOrder) customCatOrder.value = savedOrder;
+
+    let dataToUse = null;
+    const isNative = Capacitor.isNativePlatform();
+
+    // 1. 如果在平板原生环境，优先读取底层数据库
+    if (isNative) {
+      const localData = await localforage.getItem('algo-data');
+      if (localData && localData.length > 0) dataToUse = localData;
     }
-  } catch (e) { console.log("等待创建初始数据..."); }
+
+    // 2. 如果在电脑端 (或者平板初次安装没数据)，强制读取物理 data.json 确保最新！
+    if (!dataToUse || !isNative) {
+      const res = await fetch('/data.json?t=' + Date.now());
+      if (res.ok) dataToUse = await res.json();
+    }
+
+    if (dataToUse) {
+      algorithms.value = dataToUse.map(item => ({ type: item.type || 'algorithm', ...item }));
+      extractAndSyncCategories(); // 初始化时梳理一次分类标签
+      // 同步给底层数据库备份
+      await localforage.setItem('algo-data', algorithms.value); 
+    }
+  } catch (e) { console.error("数据加载失败", e); }
+};
+
+const saveToDisk = async () => {
+  try {
+    const pureData = JSON.parse(JSON.stringify(algorithms.value));
+    
+    await localforage.setItem('algo-data', pureData);
+    await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value)));
+
+    if (!Capacitor.isNativePlatform()) {
+      await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {});
+    }
+
+    if (isEditing.value) {
+      selectedAlgo.value = algorithms.value.find(a => a.id === editForm.value.id);
+      isEditing.value = false;
+    }
+  } catch (e) { console.error(e); }
 };
 
 onMounted(() => {
   loadData();
   CapApp.addListener('backButton', () => {
-    if (selectedAlgo.value || isEditing.value) goBack();
-    else CapApp.exitApp();
+    if (selectedAlgo.value || isEditing.value) goBack(); else CapApp.exitApp();
   });
 });
 
-const saveToDisk = async () => {
-  try {
-    const pureData = JSON.parse(JSON.stringify(algorithms.value));
-    const res = await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) });
-    if (res.ok) {
-      await loadData();
-      selectedAlgo.value = algorithms.value.find(a => a.id === editForm.value.id);
-      isEditing.value = false;
-    } else alert("保存到硬盘失败！");
-  } catch (e) { console.error(e); }
+// ================== 核心修复 2：滑动切题支持鼠标 ==================
+let startX = 0;
+const handleSwipeStart = (e) => {
+  startX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].screenX;
+};
+const handleSwipeEnd = (e) => {
+  if (isEditing.value) return; 
+  let endX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].screenX;
+  if (startX - endX > 80 && hasNext.value) goNext(); // 向左滑 -> 下一题
+  if (endX - startX > 80 && hasPrev.value) goPrev(); // 向右滑 -> 上一题
 };
 
-// 业务逻辑提取
+// ================== 核心修复 3：真实的分类排序逻辑 ==================
 const getCategories = (catStr) => {
   if (!catStr) return ['未分类'];
   const cats = catStr.split(/[\s,，]+/).filter(Boolean);
   return cats.length > 0 ? cats : ['未分类'];
 };
 
-const categories = computed(() => ['全部', ...new Set(algorithms.value.flatMap(a => getCategories(a.category)))]);
+// 纯展示用的 computed，不再包含任何改变数组自身的操作
+const categories = computed(() => ['全部', ...customCatOrder.value]);
+
+// 处理真实的排序移动
+const moveCategory = (index, direction) => {
+  const targetIndex = index + direction;
+  if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return;
+  // 真实交换数组位置
+  const temp = customCatOrder.value[index];
+  customCatOrder.value[index] = customCatOrder.value[targetIndex];
+  customCatOrder.value[targetIndex] = temp;
+};
+
+// ================== 其他业务逻辑 ==================
 const sortedFilteredAlgorithms = computed(() => {
   let list = activeCategory.value === '全部' ? algorithms.value : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value));
   return list.slice().sort((a, b) => {
@@ -162,28 +215,14 @@ const saveAlgo = async () => {
   const index = algorithms.value.findIndex(a => a.id === editForm.value.id);
   if (index >= 0) algorithms.value[index] = editForm.value;
   else algorithms.value.unshift(editForm.value);
+  extractAndSyncCategories(); // 保存时如果产生了新分类，确保它被加入排序列表
   await saveToDisk();
 };
 const deleteAlgo = async (id) => {
   if (!confirm("确定删除？")) return;
   algorithms.value = algorithms.value.filter(a => a.id !== id);
+  extractAndSyncCategories();
   await saveToDisk();
   if (selectedAlgo.value?.id === id) goBack();
 };
 </script>
-
-<style>
-/* CSS 现已极其精简，特定样式只保留基础安全区和行内代码黑科技 */
-.pt-safe { padding-top: calc(env(safe-area-inset-top, 0px) + 2rem); }
-img { max-width: 100%; border-radius: 8px; margin-top: 1rem; margin-bottom: 1rem; }
-.hljs { border-radius: 8px; padding: 1.5rem; margin-top: 1rem; margin-bottom: 1rem; font-size: 1.1rem;}
-
-.prose code::before, .prose code::after { content: none !important; }
-.prose code:not(pre code) {
-  background-color: #f1f5f9 !important; color: #ef4444 !important;
-  padding: 0.15rem 0.4rem !important; border-radius: 0.3rem !important;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  font-weight: 600 !important; font-size: 0.85em !important; word-break: break-word !important;
-}
-.prose-invert code:not(pre code) { background-color: #3f3f46 !important; color: #fca5a5 !important; }
-</style>
