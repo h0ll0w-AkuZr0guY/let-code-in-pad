@@ -1,11 +1,25 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ================== 安全区与全局样式 ================== */
+.pt-safe {
+  /* 强制基础 32px 边距 + 系统刘海高度，彻底告别顶部拥挤 */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 32px) !important;
+}
+
+img { max-width: 100%; border-radius: 8px; margin-top: 1rem; margin-bottom: 1rem; }
+.hljs { border-radius: 8px; padding: 1.5rem; margin-top: 1rem; margin-bottom: 1rem; font-size: 1.1rem;}
+
 /* ================== 隐藏全局滚动条 ================== */
-::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
+::-webkit-scrollbar { display: none; }
+* { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ================== 终极修复：行内代码块 ================== */
+.prose code::before, .prose code::after { content: none !important; }
+.prose code:not(pre code) {
+  background-color: #f1f5f9 !important; color: #ef4444 !important;
+  padding: 0.15rem 0.4rem !important; border-radius: 0.3rem !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-weight: 600 !important; font-size: 0.85em !important; word-break: break-word !important;
 }
-* {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
+.prose-invert code:not(pre code) { background-color: #3f3f46 !important; color: #fca5a5 !important; }

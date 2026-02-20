@@ -1,17 +1,19 @@
 <template>
-  <div class="h-screen w-screen bg-gray-100 font-sans flex flex-col overflow-hidden">
+  <div class="h-screen w-screen bg-gray-100 font-sans flex flex-col overflow-hidden relative">
     
     <HomeView 
       v-if="!selectedAlgo && !isEditing"
       :categories="categories" :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
       :getCategories="getCategories" :difficultyColor="difficultyColor"
+      :customCatColors="customCatColors"
       @update:activeCategory="activeCategory = $event"
-      @select="startView" @create="createNew" @delete="deleteAlgo"
-      @moveCat="moveCategory" @saveOrder="saveToDisk"
+      @select="startView" @create="createNew" @requestDelete="triggerDelete"
+      @moveCat="moveCategory" @saveOrder="saveToDisk" @updateCatColor="updateCatColor"
+      @openTrash="showTrashModal = true"
     />
 
     <div v-else class="h-full flex flex-col bg-white">
-      <div class="pt-safe pb-4 border-b flex justify-between items-center px-8 bg-gray-50 shrink-0 z-10 shadow-sm">
+      <div class="pt-safe pb-4 border-b border-gray-200 shadow-sm flex justify-between items-center px-8 bg-gray-50 shrink-0 z-20">
         <div class="flex items-center space-x-4 w-full mt-2">
           <button @click="goBack" class="text-gray-600 font-bold hover:text-blue-600 text-lg shrink-0">← 返回列表</button>
           
@@ -40,7 +42,7 @@
 
           <template v-else>
             <div class="flex-1 flex items-center px-4 space-x-6 border-l-2 border-gray-300 ml-4 overflow-hidden">
-              <span :class="selectedAlgo.type === 'interview' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="text-xs px-2 py-1 rounded shrink-0">
+              <span :class="selectedAlgo.type === 'interview' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="text-xs px-2 py-1 rounded shrink-0 font-bold">
                 {{ selectedAlgo.type === 'interview' ? '面经' : '算法' }}
               </span>
               <h1 class="text-2xl font-bold truncate">{{ selectedAlgo.title }}</h1>
@@ -51,7 +53,7 @@
             </div>
             <div class="flex space-x-4 shrink-0">
               <button @click="startEdit" class="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-bold hover:bg-gray-300">编辑</button>
-              <button @click="deleteAlgo(selectedAlgo.id)" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200">删除</button>
+              <button @click="triggerDelete(selectedAlgo)" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200">删除</button>
             </div>
           </template>
         </div>
@@ -63,8 +65,42 @@
         <InterviewView v-if="(isEditing ? editForm.type : selectedAlgo.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
         <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
       </div>
-      
     </div>
+
+    <div v-if="showDeleteConfirm" class="absolute inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm transition-opacity">
+      <div class="bg-white p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col transform scale-100">
+        <h3 class="text-xl font-bold text-gray-800 mb-2">移入回收站</h3>
+        <p class="text-gray-500 mb-6">确定要将 <span class="font-bold text-gray-700">"{{ itemToDelete?.title }}"</span> 移入回收站吗？</p>
+        <div class="flex justify-end space-x-3">
+          <button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">取消</button>
+          <button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 transition shadow-md">确定移动</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showTrashModal" class="absolute inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
+      <div class="bg-white p-6 rounded-2xl shadow-2xl w-[36rem] max-h-[85%] flex flex-col">
+        <div class="flex justify-between items-center mb-6 border-b pb-3">
+          <h3 class="text-xl font-bold text-gray-800 flex items-center">🗑️ 回收站 <span class="text-sm font-normal text-gray-400 ml-2">({{ trashList.length }} 项)</span></h3>
+          <button @click="showTrashModal = false" class="text-gray-400 hover:text-red-500 font-bold text-2xl leading-none">✕</button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto space-y-3 pr-2">
+          <div v-if="trashList.length === 0" class="text-center text-gray-400 mt-10">回收站是空的</div>
+          <div v-for="item in trashList" :key="item.id" class="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+            <div class="flex-1 overflow-hidden pr-4">
+              <h4 class="font-bold text-gray-700 truncate">{{ item.title }}</h4>
+              <p class="text-xs text-gray-400 mt-1">{{ item.category }} | {{ item.type === 'interview' ? '面经' : '算法' }}</p>
+            </div>
+            <div class="flex space-x-2 shrink-0">
+              <button @click="restoreItem(item)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold hover:bg-green-200 transition text-sm">恢复</button>
+              <button @click="permanentlyDelete(item)" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold hover:bg-red-200 transition text-sm">彻底删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -72,19 +108,55 @@
 import { ref, computed, onMounted } from 'vue';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 import localforage from 'localforage';
 import HomeView from './components/HomeView.vue';
 import AlgoView from './components/AlgoView.vue';
 import InterviewView from './components/InterviewView.vue';
 
 const algorithms = ref([]);
+const trashList = ref([]); // 回收站列表
 const activeCategory = ref('全部');
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
 const customCatOrder = ref([]); 
+const customCatColors = ref({}); 
 const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {} });
 
-// ================== 核心修复 1：严格区分存储环境 ==================
+// ================== 删除与回收站状态控制 ==================
+const showDeleteConfirm = ref(false);
+const showTrashModal = ref(false);
+const itemToDelete = ref(null);
+
+const triggerDelete = (item) => {
+  itemToDelete.value = item;
+  showDeleteConfirm.value = true;
+};
+
+const confirmDelete = async () => {
+  const item = itemToDelete.value;
+  algorithms.value = algorithms.value.filter(a => a.id !== item.id);
+  trashList.value.unshift(item); // 放入回收站顶部
+  showDeleteConfirm.value = false;
+  extractAndSyncCategories();
+  await saveToDisk();
+  if (selectedAlgo.value?.id === item.id) goBack();
+};
+
+const restoreItem = async (item) => {
+  trashList.value = trashList.value.filter(a => a.id !== item.id);
+  algorithms.value.unshift(item); // 恢复到主列表
+  extractAndSyncCategories();
+  await saveToDisk();
+};
+
+const permanentlyDelete = async (item) => {
+  if (confirm(`彻底删除 "${item.title}" 将无法找回，确认删除？`)) {
+    trashList.value = trashList.value.filter(a => a.id !== item.id);
+    await saveToDisk();
+  }
+};
+
 const extractAndSyncCategories = () => {
   const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category)));
   const ordered = customCatOrder.value.filter(c => allCats.has(c));
@@ -96,17 +168,21 @@ const loadData = async () => {
   try {
     const savedOrder = await localforage.getItem('cat-order');
     if (savedOrder) customCatOrder.value = savedOrder;
+    const savedColors = await localforage.getItem('cat-colors');
+    if (savedColors) customCatColors.value = savedColors;
+    const savedTrash = await localforage.getItem('algo-trash');
+    if (savedTrash) trashList.value = savedTrash;
 
     let dataToUse = null;
     const isNative = Capacitor.isNativePlatform();
-
-    // 1. 如果在平板原生环境，优先读取底层数据库
+    
+    // 【核心】强制设备端强制锁定横屏
     if (isNative) {
+      ScreenOrientation.lock({ orientation: 'landscape' }).catch(e => console.log('锁定横屏失败', e));
       const localData = await localforage.getItem('algo-data');
       if (localData && localData.length > 0) dataToUse = localData;
     }
-
-    // 2. 如果在电脑端 (或者平板初次安装没数据)，强制读取物理 data.json 确保最新！
+    
     if (!dataToUse || !isNative) {
       const res = await fetch('/data.json?t=' + Date.now());
       if (res.ok) dataToUse = await res.json();
@@ -114,8 +190,7 @@ const loadData = async () => {
 
     if (dataToUse) {
       algorithms.value = dataToUse.map(item => ({ type: item.type || 'algorithm', ...item }));
-      extractAndSyncCategories(); // 初始化时梳理一次分类标签
-      // 同步给底层数据库备份
+      extractAndSyncCategories();
       await localforage.setItem('algo-data', algorithms.value); 
     }
   } catch (e) { console.error("数据加载失败", e); }
@@ -126,7 +201,9 @@ const saveToDisk = async () => {
     const pureData = JSON.parse(JSON.stringify(algorithms.value));
     
     await localforage.setItem('algo-data', pureData);
+    await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value))); // 保存回收站
     await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value)));
+    await localforage.setItem('cat-colors', JSON.parse(JSON.stringify(customCatColors.value)));
 
     if (!Capacitor.isNativePlatform()) {
       await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {});
@@ -139,46 +216,46 @@ const saveToDisk = async () => {
   } catch (e) { console.error(e); }
 };
 
+const updateCatColor = async (cat, color) => {
+  customCatColors.value[cat] = color;
+  await saveToDisk();
+};
+
 onMounted(() => {
   loadData();
   CapApp.addListener('backButton', () => {
-    if (selectedAlgo.value || isEditing.value) goBack(); else CapApp.exitApp();
+    if (showDeleteConfirm.value) showDeleteConfirm.value = false;
+    else if (showTrashModal.value) showTrashModal.value = false;
+    else if (selectedAlgo.value || isEditing.value) goBack(); 
+    else CapApp.exitApp();
   });
 });
 
-// ================== 核心修复 2：滑动切题支持鼠标 ==================
 let startX = 0;
-const handleSwipeStart = (e) => {
-  startX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].screenX;
-};
+const handleSwipeStart = (e) => { startX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].screenX; };
 const handleSwipeEnd = (e) => {
   if (isEditing.value) return; 
   let endX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].screenX;
-  if (startX - endX > 80 && hasNext.value) goNext(); // 向左滑 -> 下一题
-  if (endX - startX > 80 && hasPrev.value) goPrev(); // 向右滑 -> 上一题
+  if (startX - endX > 80 && hasNext.value) goNext();
+  if (endX - startX > 80 && hasPrev.value) goPrev();
 };
 
-// ================== 核心修复 3：真实的分类排序逻辑 ==================
 const getCategories = (catStr) => {
   if (!catStr) return ['未分类'];
   const cats = catStr.split(/[\s,，]+/).filter(Boolean);
   return cats.length > 0 ? cats : ['未分类'];
 };
 
-// 纯展示用的 computed，不再包含任何改变数组自身的操作
 const categories = computed(() => ['全部', ...customCatOrder.value]);
 
-// 处理真实的排序移动
 const moveCategory = (index, direction) => {
   const targetIndex = index + direction;
   if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return;
-  // 真实交换数组位置
   const temp = customCatOrder.value[index];
   customCatOrder.value[index] = customCatOrder.value[targetIndex];
   customCatOrder.value[targetIndex] = temp;
 };
 
-// ================== 其他业务逻辑 ==================
 const sortedFilteredAlgorithms = computed(() => {
   let list = activeCategory.value === '全部' ? algorithms.value : algorithms.value.filter(a => getCategories(a.category).includes(activeCategory.value));
   return list.slice().sort((a, b) => {
@@ -215,14 +292,7 @@ const saveAlgo = async () => {
   const index = algorithms.value.findIndex(a => a.id === editForm.value.id);
   if (index >= 0) algorithms.value[index] = editForm.value;
   else algorithms.value.unshift(editForm.value);
-  extractAndSyncCategories(); // 保存时如果产生了新分类，确保它被加入排序列表
+  extractAndSyncCategories(); 
   await saveToDisk();
-};
-const deleteAlgo = async (id) => {
-  if (!confirm("确定删除？")) return;
-  algorithms.value = algorithms.value.filter(a => a.id !== id);
-  extractAndSyncCategories();
-  await saveToDisk();
-  if (selectedAlgo.value?.id === id) goBack();
 };
 </script>
