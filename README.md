@@ -30,7 +30,7 @@ A lightweight, fully offline, and tablet-optimized personal knowledge base.
 - Android Studio (if you want to build the Android APK).
 
 ### 2. Installation
-```bash
+``` bash
 git clone https://github.com/h0ll0w-AkuZr0guY/let-code-in-pad.git
 cd let-code-in-pad
 npm install
@@ -41,7 +41,7 @@ npm install
 Start the local server with physical file-writing permissions:
 
 
-```bash
+``` bash
 npm run dev
 ```
 
@@ -51,7 +51,7 @@ npm run dev
 ### 4. Tablet Workflow (Android APK Export)
 
 
-```bash
+``` bash
 npm run build
 npx cap sync
 npx cap open android

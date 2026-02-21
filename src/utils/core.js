@@ -22,6 +22,12 @@ export const turndownService = new TurndownService({
   emDelimiter: '*'
 });
 
+// 【核心修复 1】：彻底禁用 Turndown 的自动转义机制
+// 防止 > 和 [ ] 等符号前面被强行加上丑陋的反斜杠 \
+turndownService.escape = function (string) {
+  return string;
+};
+
 // 3. 渲染 Markdown (含本地图片解析)
 export const renderMarkdown = (text, images = {}) => {
   if (!text) return '';
@@ -38,7 +44,7 @@ export const renderSolution = (text, lang, images) => {
   return renderMarkdown(processText, images);
 };
 
-// 4. 智能粘贴核心逻辑 (支持图片 Base64 提取与富文本解析)
+// 4. 智能粘贴核心逻辑
 export const handleSmartPaste = (event, reactiveObj, targetField) => {
   const clipboardData = event.clipboardData || window.clipboardData;
   if (!clipboardData) return;
@@ -54,7 +60,7 @@ export const handleSmartPaste = (event, reactiveObj, targetField) => {
     }, 10);
   };
 
-  // 优先处理图片
+  // 优先处理图片提取
   const items = clipboardData.items;
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.indexOf('image') !== -1) {
@@ -73,12 +79,35 @@ export const handleSmartPaste = (event, reactiveObj, targetField) => {
     }
   }
 
-  // 处理富文本转 Markdown (仅当未复制纯代码时)
+  // 获取剪贴板中的 HTML 和纯文本
   const htmlData = clipboardData.getData('text/html');
   const plainText = clipboardData.getData('text/plain');
-  if (htmlData && !plainText.match(/(```|##|\[.*\]\(.*\))/)) {
-    event.preventDefault();
-    let markdown = turndownService.turndown(htmlData).replace(/\n{3,}/g, '\n\n');
-    insertTextAtCursor(event.target, markdown);
+  
+  if (htmlData) {
+    // 【核心修复 2】：更聪明的代码环境侦测
+    // 判断是否是从 VS Code、LeetCode IDE 等代码编辑器复制的代码
+    const isFromIDE = htmlData.includes('vscode') || 
+                      htmlData.includes('monaco') || 
+                      htmlData.includes('CodeMirror') || 
+                      htmlData.includes('font-family: Consolas');
+    
+    // 判断是否真正包含具有排版意义的富文本标签
+    const isRichText = /<(h[1-6]|b|strong|em|i|a|p|ul|li|table|blockquote)[^>]*>/i.test(htmlData);
+
+    // 【判断逻辑】：只有在确认为“富文本”且“非代码片段”时，才进行 Markdown 转换。
+    // 如果是纯代码，直接 let it go，让浏览器原封不动地粘贴纯文本（完美保留你的缩进和单行换行）
+    if (isRichText && !isFromIDE && !plainText.match(/^```/)) {
+      event.preventDefault();
+      let markdown = turndownService.turndown(htmlData);
+      
+      // 【核心修复 3】：去除加粗标记内部的多余空格（修复冒号共存时的解析失败）
+      // 将 "**输入: **" 自动修正为 "**输入:**"
+      markdown = markdown.replace(/\*\*([\s\S]*?)\*\*/g, (match, p1) => `**${p1.trim()}**`);
+      
+      // 剔除过多连续的冗余换行符
+      markdown = markdown.replace(/\n{3,}/g, '\n\n');
+      
+      insertTextAtCursor(event.target, markdown);
+    }
   }
 };

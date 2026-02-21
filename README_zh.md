@@ -31,7 +31,7 @@
 - 若需打包 APK，请提前安装 Android Studio。
 
 ### 2. 安装项目
-```bash
+``` bash
 git clone https://github.com/h0ll0w-AkuZr0guY/let-code-in-pad.git
 cd let-code-in-pad
 npm install
@@ -40,7 +40,7 @@ npm install
 ### 3. 电脑端生产 (录入工作流)
 
 
-​```bash
+​``` bash
 npm run dev
 ```
 
@@ -49,8 +49,7 @@ npm run dev
 
 ### 4. 平板端消费 (打包 APK)
 
-
-```bash
+``` bash
 npm run build
 npx cap sync
 npx cap open android
