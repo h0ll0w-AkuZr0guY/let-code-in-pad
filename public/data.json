@@ -1,5 +1,41 @@
 [
   {
+    "id": "1771726986990",
+    "title": "152. 乘积最大子数组",
+    "category": "数组 动态规划",
+    "type": "algorithm",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "给你一个整数数组 `nums` ，请你找出数组中乘积最大的非空连续 子数组（该子数组中至少包含一个数字），并返回该子数组所对应的乘积。\n\n测试用例的答案是一个 **32-位** 整数。\n\n**请注意**，一个只包含一个元素的数组的乘积是这个元素的值。\n\n**示例 1:**\n> **输入:** nums = [2,3,-2,4]\n> **输出:** `6`\n> **解释:** 子数组 [2,3] 有最大乘积 6。\n\n**示例 2:**\n> **输入:** nums = [-2,0,-1]\n> **输出:** 0\n> **解释:** 结果不能为 2, 因为 [-2,-1] 不是子数组。\n\n**提示:**\n*   `1 <= nums.length <= 2 * 104`\n*   `-10 <= nums[i] <= 10`\n*   `nums` 的任何子数组的乘积都 **保证** 是一个 **32-位** 整数",
+    "solutionText": "class Solution(object):\n    def maxProduct(self, nums):\n        if not nums:\n            return 0\n        current_max = current_min = global_max = nums[0]\n        \n        # 从第二个元素开始遍历\n        for num in nums[1:]:\n            # 因为当前数可能是负数，乘以前面的最小值可能变成最大值，所以先保存当前max\n            temp = current_max\n            current_max = max(num, temp * num, current_min * num)\n            current_min = min(num, temp * num, current_min * num)\n            global_max = max(global_max, current_max)\n        return global_max\n        \"\"\"\n        :type nums: List[int]\n        :rtype: int\n        \"\"\"",
+    "images": {},
+    "isPinned": false
+  },
+  {
+    "type": "algorithm",
+    "isPinned": false,
+    "id": "1771726036363",
+    "title": "300. 最长递增子序列",
+    "category": "数组 二分查找 动态规划",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "给你一个整数数组 `nums` ，找到其中最长严格递增子序列的长度。\n\n**子序列** 是由数组派生而来的序列，删除（或不删除）数组中的元素而不改变其余元素的顺序。例如，`[3,6,2,7]` 是数组 `[0,3,1,6,2,2,7]` 的子序列。\n\n**示例 1：**\n> **输入：** nums = [10,9,2,5,3,7,101,18]\n> **输出：** 4\n> **解释：** 最长递增子序列是 [2,3,7,101]，因此长度为 4 。\n\n**示例 2：**\n> **输入：** nums = [0,1,0,3,2,3]\n> **输出：** 4\n\n**示例 3：**\n> **输入：** nums = [7,7,7,7,7,7,7]\n> **输出：** 1\n\n**提示：**\n*   `1 <= nums.length <= 2500`\n*   `-104 <= nums[i] <= 104`\n\n**进阶：**\n*   你能将算法的时间复杂度降低到 `O(n log(n))` 吗?",
+    "solutionText": "class Solution(object):\n    def lengthOfLIS(self, nums):\n        if not nums:\n            return 0\n        dp = []\n        for i in range(len(nums)):\n            dp.append(1)\n            for j in range(i):\n                if nums[i] > nums[j]:\n                    dp[i] = max(dp[i], dp[j] + 1)\n        return max(dp)\n                \n        \"\"\"\n        :type nums: List[int]\n        :rtype: int\n        \"\"\"\n        ",
+    "images": {}
+  },
+  {
+    "type": "algorithm",
+    "isPinned": false,
+    "id": "1771724706431",
+    "title": "139. 单词拆分",
+    "category": "数组 哈希表 字符串 动态规划",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "给你一个字符串 `s` 和一个字符串列表 `wordDict` 作为字典。如果可以利用字典中出现的一个或多个单词拼接出 `s` 则返回 `true`。\n\n**注意：**不要求字典中出现的单词全部都使用，并且字典中的单词可以重复使用。\n\n**示例 1：**\n> **输入:** s = \"leetcode\", wordDict = [\"leet\", \"code\"]\n> **输出:** true\n> **解释:** 返回 true 因为 \"leetcode\" 可以由 \"leet\" 和 \"code\" 拼接成。\n\n**示例 2：**\n> **输入:** s = \"applepenapple\", wordDict = [\"apple\", \"pen\"]\n> **输出:** true\n> **解释:** 返回 true 因为 \"applepenapple\" 可以由 \"apple\" \"pen\" \"apple\" 拼接成。\n>      注意，你可以重复使用字典中的单词。\n\n**示例 3：**\n> **输入:** s = \"catsandog\", wordDict = [\"cats\", \"dog\", \"sand\", \"and\", \"cat\"]\n> **输出:** false\n\n**提示：**\n*   `1 <= s.length <= 300`\n*   `1 <= wordDict.length <= 1000`\n*   `1 <= wordDict[i].length <= 20`\n*   `s` 和 `wordDict[i]` 仅由小写英文字母组成\n*   `wordDict` 中的所有字符串 **互不相同**",
+    "solutionText": "class Solution(object):\n    def wordBreak(self, s, wordDict):\n        dp = [False] * (len(s) + 1)\n        dp[0] = True\n        for j in range(1, len(s) + 1):\n            for word in wordDict:\n                if j >= len(word):\n                    dp[j] = dp[j] or (dp[j - len(word)]) and word == s[j - len(word):j] \n        return dp[len(s)]\n        \"\"\"\n        :type s: str\n        :type wordDict: List[str]\n        :rtype: bool\n        \"\"\"\n        ",
+    "images": {}
+  },
+  {
     "type": "algorithm",
     "isPinned": false,
     "id": "1771643279914",
