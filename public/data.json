@@ -1,15 +1,27 @@
 [
   {
+    "id": "1771851417057",
+    "title": "test",
+    "category": "",
+    "type": "diary",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "hello",
+    "solutionText": "",
+    "images": {},
+    "isPinned": false
+  },
+  {
+    "type": "algorithm",
+    "isPinned": false,
     "id": "1771837303006",
     "title": "416. 分割等和子集",
     "category": "数组 动态规划",
-    "type": "algorithm",
     "difficulty": "中等",
     "language": "python",
     "problemText": "给你一个 **只包含正整数** 的 **非空** 数组 `nums` 。请你判断是否可以将这个数组分割成两个子集，使得两个子集的元素和相等。\n\n**示例 1：**\n> **输入：** nums = [1,5,11,5]\n> **输出：** true\n> **解释：** 数组可以分割成 [1, 5, 5] 和 [11] 。\n\n**示例 2：**\n> **输入：** nums = [1,2,3,5]\n> **输出：** false\n> **解释：** 数组不能分割成两个元素和相等的子集。\n\n**提示：**\n*   `1 <= nums.length <= 200`\n*   `1 <= nums[i] <= 100`",
     "solutionText": "class Solution(object):\n    def canPartition(self, nums):\n        # 总数除二，变成能否取得等值序列\n        total_sum = sum(nums)\n        if total_sum % 2 != 0:\n            return False\n        target = total_sum // 2\n\n        if target < max(nums):  # 单个元素超过一半\n            return False\n        \n        dp = [False] * (target + 1)\n        dp[0] = True # 和为0一定存在（空集）\n        for num in nums:\n            for j in range(target, num - 1, -1):  # 逆序遍历\n                # 如果j-num能凑出，或者j本身已经凑出 \n                dp[j] = dp[j] or dp[j - num] \n\n        return dp[target]\n        \"\"\"\n        :type nums: List[int]\n        :rtype: bool\n        \"\"\"\n        \n        ",
-    "images": {},
-    "isPinned": false
+    "images": {}
   },
   {
     "type": "algorithm",
