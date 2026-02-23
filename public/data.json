@@ -1,15 +1,51 @@
 [
   {
-    "id": "1771726986990",
-    "title": "152. 乘积最大子数组",
+    "id": "1771837303006",
+    "title": "416. 分割等和子集",
     "category": "数组 动态规划",
     "type": "algorithm",
     "difficulty": "中等",
     "language": "python",
-    "problemText": "给你一个整数数组 `nums` ，请你找出数组中乘积最大的非空连续 子数组（该子数组中至少包含一个数字），并返回该子数组所对应的乘积。\n\n测试用例的答案是一个 **32-位** 整数。\n\n**请注意**，一个只包含一个元素的数组的乘积是这个元素的值。\n\n**示例 1:**\n> **输入:** nums = [2,3,-2,4]\n> **输出:** `6`\n> **解释:** 子数组 [2,3] 有最大乘积 6。\n\n**示例 2:**\n> **输入:** nums = [-2,0,-1]\n> **输出:** 0\n> **解释:** 结果不能为 2, 因为 [-2,-1] 不是子数组。\n\n**提示:**\n*   `1 <= nums.length <= 2 * 104`\n*   `-10 <= nums[i] <= 10`\n*   `nums` 的任何子数组的乘积都 **保证** 是一个 **32-位** 整数",
-    "solutionText": "class Solution(object):\n    def maxProduct(self, nums):\n        if not nums:\n            return 0\n        current_max = current_min = global_max = nums[0]\n        \n        # 从第二个元素开始遍历\n        for num in nums[1:]:\n            # 因为当前数可能是负数，乘以前面的最小值可能变成最大值，所以先保存当前max\n            temp = current_max\n            current_max = max(num, temp * num, current_min * num)\n            current_min = min(num, temp * num, current_min * num)\n            global_max = max(global_max, current_max)\n        return global_max\n        \"\"\"\n        :type nums: List[int]\n        :rtype: int\n        \"\"\"",
+    "problemText": "给你一个 **只包含正整数** 的 **非空** 数组 `nums` 。请你判断是否可以将这个数组分割成两个子集，使得两个子集的元素和相等。\n\n**示例 1：**\n> **输入：** nums = [1,5,11,5]\n> **输出：** true\n> **解释：** 数组可以分割成 [1, 5, 5] 和 [11] 。\n\n**示例 2：**\n> **输入：** nums = [1,2,3,5]\n> **输出：** false\n> **解释：** 数组不能分割成两个元素和相等的子集。\n\n**提示：**\n*   `1 <= nums.length <= 200`\n*   `1 <= nums[i] <= 100`",
+    "solutionText": "class Solution(object):\n    def canPartition(self, nums):\n        # 总数除二，变成能否取得等值序列\n        total_sum = sum(nums)\n        if total_sum % 2 != 0:\n            return False\n        target = total_sum // 2\n\n        if target < max(nums):  # 单个元素超过一半\n            return False\n        \n        dp = [False] * (target + 1)\n        dp[0] = True # 和为0一定存在（空集）\n        for num in nums:\n            for j in range(target, num - 1, -1):  # 逆序遍历\n                # 如果j-num能凑出，或者j本身已经凑出 \n                dp[j] = dp[j] or dp[j - num] \n\n        return dp[target]\n        \"\"\"\n        :type nums: List[int]\n        :rtype: bool\n        \"\"\"\n        \n        ",
     "images": {},
     "isPinned": false
+  },
+  {
+    "type": "algorithm",
+    "isPinned": false,
+    "id": "1771837165647",
+    "title": "62. 不同路径",
+    "category": "数学 动态规划",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "一个机器人位于一个 `m x n` 网格的左上角 （起始点在下图中标记为 “Start” ）。\n\n机器人每次只能向下或者向右移动一步。机器人试图达到网格的右下角（在下图中标记为 “Finish” ）。\n\n问总共有多少条不同的路径？\n\n**示例 1：**\n![图片](/images/img_177183720787323.png)\n**输入：** m = 3, n = 7\n**输出：** 28\n\n**示例 2：**\n> **输入：** m = 3, n = 2\n> **输出：** 3\n> **解释：**\n> 从左上角开始，总共有 3 条路径可以到达右下角。\n> 1. 向右 -> 向下 -> 向下\n> 2. 向下 -> 向下 -> 向右\n> 3. 向下 -> 向右 -> 向下\n\n**示例 3：**\n> **输入：** m = 7, n = 3\n> **输出：** 28\n\n**示例 4：**\n> **输入：** m = 3, n = 3\n> **输出：** 6\n\n**提示：**\n*   `1 <= m, n <= 100`\n*   题目数据保证答案小于等于 `2 * 109`",
+    "solutionText": "class Solution(object):\n    def uniquePaths(self, m, n):\n        # dp[i][j]可以由dp[i-1][j]向下或dp[i][j-1]向右到达\n        # 所以dp[i][j] = dp[i-1][j] + dp[i][j-1]\n        dp = [[1] * n for _ in range(m)]\n        for i in range(1, m):\n            for j in range(1, n):\n                dp[i][j] = dp[i-1][j] + dp[i][j-1]\n        return dp[-1][-1]\n        \"\"\"\n        :type m: int\n        :type n: int\n        :rtype: int\n        # 优化版本\n        dp = [1] * n\n        \n        # 遍历每一行（从第二行开始）\n        for i in range(1, m):\n            # 遍历每一列（从第二列开始）\n            for j in range(1, n):\n                # 核心优化：dp[j] = 上一行的dp[j]（原dp[j]） + 左边的dp[j-1]（已更新的当前行）\n                dp[j] = dp[j] + dp[j-1]\n        \n        return dp[-1]\n        \"\"\"\n        ",
+    "images": {}
+  },
+  {
+    "type": "algorithm",
+    "isPinned": false,
+    "id": "1771836991106",
+    "title": "64. 最小路径和",
+    "category": "数组 动态规划 矩阵",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "给定一个包含非负整数的 `m x n` 网格 `grid` ，请找出一条从左上角到右下角的路径，使得路径上的数字总和为最小。\n\n**说明：** 每次只能向下或者向右移动一步。\n\n**示例 1：**\n![图片](/images/img_177183704794361.png)\n> **输入：** grid = [[1,3,1],[1,5,1],[4,2,1]]\n> **输出：** 7\n> **解释：** 因为路径 1→3→1→1→1 的总和最小。\n\n**示例 2：**\n> **输入：** grid = [[1,2,3],[4,5,6]]\n> **输出：** 12\n\n**提示：**\n*   `m == grid.length`\n*   `n == grid[i].length`\n*   `1 <= m, n <= 200`\n*   `0 <= grid[i][j] <= 200`",
+    "solutionText": "class Solution(object):\n    def minPathSum(self, grid):\n        # dp[i][j] += min(dp[i-1][j], dp[i][j - 1])\n        if not grid or not grid[0]:\n            return 0\n        m = len(grid)\n        n = len(grid[0])\n        for i in range(1, m): # 第一步：初始化第一列（只能从上到下走）\n            grid[i][0] += grid[i-1][0]\n        for j in range(1, n):# 第二步：初始化第一行（只能从左到右走）\n            grid[0][j] += grid[0][j-1]\n        for i in range(1, m):\n            for j in range(1, n):\n                grid[i][j] += min(grid[i-1][j], grid[i][j-1])\n        return grid[-1][-1]\n        \"\"\"\n        :type grid: List[List[int]]\n        :rtype: int\n        \"\"\"\n        ",
+    "images": {}
+  },
+  {
+    "type": "algorithm",
+    "isPinned": false,
+    "id": "1771726986990",
+    "title": "152. 乘积最大子数组",
+    "category": "数组 动态规划",
+    "difficulty": "中等",
+    "language": "python",
+    "problemText": "给你一个整数数组 `nums` ，请你找出数组中乘积最大的非空连续 子数组（该子数组中至少包含一个数字），并返回该子数组所对应的乘积。\n\n测试用例的答案是一个 **32-位** 整数。\n\n**请注意**，一个只包含一个元素的数组的乘积是这个元素的值。\n\n**示例 1:**\n> **输入:** nums = [2,3,-2,4]\n> **输出:** `6`\n> **解释:** 子数组 [2,3] 有最大乘积 6。\n\n**示例 2:**\n> **输入:** nums = [-2,0,-1]\n> **输出:** 0\n> **解释:** 结果不能为 2, 因为 [-2,-1] 不是子数组。\n\n**提示:**\n*   `1 <= nums.length <= 2 * 104`\n*   `-10 <= nums[i] <= 10`\n*   `nums` 的任何子数组的乘积都 **保证** 是一个 **32-位** 整数",
+    "solutionText": "class Solution(object):\n    def maxProduct(self, nums):\n        if not nums:\n            return 0\n        current_max = current_min = global_max = nums[0]\n        \n        # 从第二个元素开始遍历\n        for num in nums[1:]:\n            # 因为当前数可能是负数，乘以前面的最小值可能变成最大值，所以先保存当前max\n            temp = current_max\n            current_max = max(num, temp * num, current_min * num)\n            current_min = min(num, temp * num, current_min * num)\n            global_max = max(global_max, current_max)\n        return global_max\n        \"\"\"\n        :type nums: List[int]\n        :rtype: int\n        \"\"\"",
+    "images": {}
   },
   {
     "type": "algorithm",
