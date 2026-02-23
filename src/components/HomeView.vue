@@ -17,7 +17,7 @@
         </div>
 
         <div class="flex space-x-3 shrink-0">
-          <button @click="$emit('importData')" class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-gray-50">📥 导入</button>
+          <button @click="$emit('openImportCenter')" class="bg-white border border-gray-200 text-purple-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-purple-50 transition">📥 同步中心</button>
           <button @click="$emit('openUserCenter')" class="bg-white border border-gray-200 text-blue-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-blue-50">👤 个人中心</button>
           <button @click="$emit('openTrash')" class="bg-white border border-gray-200 text-red-500 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-red-50">🗑️ 回收站</button>
           <button @click="showOrderModal = true" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-gray-50">⚙️ 标签管理</button>
@@ -96,7 +96,7 @@
 <script setup>
 import { ref } from 'vue';
 const props = defineProps(['categories', 'globalCategories', 'activeCategory', 'activeTypeMode', 'appSpace', 'sortedList', 'getCategories', 'difficultyColor', 'customCatColors']);
-const emit = defineEmits(['update:activeCategory', 'update:activeTypeMode', 'select', 'create', 'openMenu', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash', 'openUserCenter', 'importData']);
+const emit = defineEmits(['update:activeCategory', 'update:activeTypeMode', 'select', 'create', 'openMenu', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash', 'openUserCenter', 'openImportCenter']);
 
 const showOrderModal = ref(false);
 const closeOrderModal = () => { showOrderModal.value = false; emit('saveOrder'); };
