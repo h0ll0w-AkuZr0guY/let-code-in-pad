@@ -8,7 +8,6 @@ export default defineConfig({
   base: './', 
   server: {
     watch: {
-      // 【核心修复】：忽略 public 文件夹的监听，防止物理写入 data.json 触发 Vite 全局刷新导致页面闪回首页
       ignored: ['**/public/**']
     }
   },
@@ -16,7 +15,9 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     {
-      name: 'local-file-saver',
+      name: 'local-file-manager',
+      
+      // 1. 本地开发时的保存拦截逻辑（保持不变）
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/api/save' && req.method === 'POST') {
@@ -60,6 +61,25 @@ export default defineConfig({
             next();
           }
         });
+      },
+
+      // 2. 【核心新增】打包完成后的自动清洗逻辑
+      closeBundle() {
+        const outDir = path.resolve(__dirname, 'dist');
+        const imgDir = path.join(outDir, 'images');
+        const dataFile = path.join(outDir, 'data.json');
+        
+        // 生产构建时，强制将 dist 里的 data.json 重置为空数组
+        if (fs.existsSync(dataFile)) {
+          fs.writeFileSync(dataFile, '[]', 'utf-8');
+          console.log('✅ Build: 已自动清空 data.json，输出空壳结构。');
+        }
+        
+        // 生产构建时，强制删除 dist 里拷贝过去的图片文件夹
+        if (fs.existsSync(imgDir)) {
+          fs.rmSync(imgDir, { recursive: true, force: true });
+          console.log('✅ Build: 已移除打包文件中的本地物理图片。');
+        }
       }
     }
   ],
