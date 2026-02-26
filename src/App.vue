@@ -59,34 +59,19 @@
       <div class="flex-1 flex overflow-hidden relative">
         <FloatingNav v-if="!isEditing" :hasPrev="hasPrev" :hasNext="hasNext" @prev="goPrev" @next="goNext" />
         
-        <TocPanel :show="isTocOpen && !isEditing && selectedAlgo?.type !== 'algorithm'" :form="selectedAlgo" @close="isTocOpen = false" />
-
+        <TocPanel :show="isTocOpen && !isEditing && selectedAlgo?.type !== 'algorithm'" :form="selectedAlgo" @close="isTocOpen = false" :contentFontSize="contentFontSize" />
         <DiaryView v-if="['diary', 'journal'].includes(isEditing ? editForm.type : selectedAlgo?.type)" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
         <InterviewView v-else-if="(isEditing ? editForm.type : selectedAlgo?.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
         <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
       </div>
 
       <div v-if="selectedAlgo && !isEditing" class="fixed bottom-8 right-8 flex flex-col space-y-4 z-[100]">
-        
         <div class="flex flex-col bg-white dark:bg-gray-800 rounded-full shadow-lg border dark:border-gray-700 border-gray-200 overflow-hidden group">
-          <button @click="increaseFontSize" class="w-14 h-10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition font-bold text-lg border-b border-gray-100 dark:border-gray-700" title="放大字号">A+</button>
-          <button @click="decreaseFontSize" class="w-14 h-10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition font-bold text-sm" title="缩小字号">A-</button>
+          <button @click="increaseFontSize" class="w-14 h-10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition font-bold text-lg border-b border-gray-100 dark:border-gray-700">A+</button>
+          <button @click="decreaseFontSize" class="w-14 h-10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition font-bold text-sm">A-</button>
         </div>
-
-        <button v-if="selectedAlgo.type !== 'algorithm'" @click="toggleToc" class="w-14 h-14 bg-white dark:bg-gray-800 text-blue-500 dark:text-blue-400 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all group border dark:border-gray-700 border-gray-200">
-          📑
-          <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
-            {{ isTocOpen ? '关闭侧边目录' : '打开侧边目录' }}
-          </span>
-        </button>
-
-        <button @click="toggleDarkMode" class="w-14 h-14 bg-gray-800 dark:bg-gray-100 text-yellow-300 dark:text-gray-800 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all group border dark:border-transparent border-gray-700">
-          {{ isDarkMode ? '☀️' : '🌙' }}
-          <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
-            {{ isDarkMode ? '切换浅色模式' : '切换深色模式' }}
-          </span>
-        </button>
-
+        <button v-if="selectedAlgo.type !== 'algorithm'" @click="toggleToc" class="w-14 h-14 bg-white dark:bg-gray-800 text-blue-500 dark:text-blue-400 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 transition-all border dark:border-gray-700 border-gray-200">📑</button>
+        <button @click="toggleDarkMode" class="w-14 h-14 bg-gray-800 dark:bg-gray-100 text-yellow-300 dark:text-gray-800 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 transition-all border dark:border-transparent border-gray-700">{{ isDarkMode ? '☀️' : '🌙' }}</button>
       </div>
     </div>
 
@@ -95,50 +80,10 @@
     <UserCenterModal :show="showUserCenter" :appSpace="appSpace" :defaultAppSpace="defaultAppSpace" :algoCount="algoCount" :interviewCount="interviewCount" :diaryCount="diaryCount" :journalCount="journalCount" @close="showUserCenter = false" @toggleAppSpace="toggleAppSpace" @toggleDefaultSpace="toggleDefaultSpace" @exportData="handleExportData" />
     <ImportSyncModal :show="showImportModal" :isSyncing="isSyncing" :savedGithubUrl="savedGithubUrl" @close="showImportModal = false" @syncGithub="handleGithubSync" @syncMarkdown="handleMarkdownImport" @syncClipboard="handleClipboardImport" />
 
-    <div v-if="showDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
-        <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">移入回收站</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">确定将 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ itemToDelete?.title }}"</span> 移入回收站？</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button>
-          <button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">确定</button>
-        </div>
-      </div>
-    </div>
-    
-    <div v-if="showBulkDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
-        <h3 class="text-xl font-bold dark:text-red-400 text-red-600 mb-2">批量移入回收站</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">确定要将选中的 <span class="font-bold text-red-500 text-lg mx-1">{{ pendingBulkIds.length }}</span> 项移入回收站吗？</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="showBulkDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button>
-          <button @click="confirmBulkDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">全部移动</button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showEmptyTrashConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[26rem] flex flex-col border-t-8 border-red-500">
-        <h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">⚠️ 危险操作：彻底清空</h3>
-        <p class="text-gray-600 dark:text-gray-400 mb-6">彻底清空回收站后，<span class="font-bold text-black dark:text-white">所有数据将永远无法找回</span>。确认清空吗？</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="showEmptyTrashConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">保留数据</button>
-          <button @click="confirmEmptyTrash" class="px-5 py-2 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 shadow-md">确认彻底清空</button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showPermDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
-        <h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">彻底删除</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">彻底删除 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ pendingPermItem?.title }}"</span> 将无法找回，确认？</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="showPermDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button>
-          <button @click="confirmPermDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">彻底删除</button>
-        </div>
-      </div>
-    </div>
-
+    <div v-if="showDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col"><h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">移入回收站</h3><p class="text-gray-500 dark:text-gray-400 mb-6">确定将 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ itemToDelete?.title }}"</span> 移入回收站？</p><div class="flex justify-end space-x-3"><button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button><button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">确定</button></div></div></div>
+    <div v-if="showBulkDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col"><h3 class="text-xl font-bold dark:text-red-400 text-red-600 mb-2">批量移入回收站</h3><p class="text-gray-500 dark:text-gray-400 mb-6">确定要将选中的 <span class="font-bold text-red-500 text-lg mx-1">{{ pendingBulkIds.length }}</span> 项移入回收站吗？</p><div class="flex justify-end space-x-3"><button @click="showBulkDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button><button @click="confirmBulkDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">全部移动</button></div></div></div>
+    <div v-if="showEmptyTrashConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[26rem] flex flex-col border-t-8 border-red-500"><h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">⚠️ 危险操作：彻底清空</h3><p class="text-gray-600 dark:text-gray-400 mb-6">彻底清空回收站后，<span class="font-bold text-black dark:text-white">所有数据将永远无法找回</span>。确认清空吗？</p><div class="flex justify-end space-x-3"><button @click="showEmptyTrashConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">保留数据</button><button @click="confirmEmptyTrash" class="px-5 py-2 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 shadow-md">确认彻底清空</button></div></div></div>
+    <div v-if="showPermDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col"><h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">彻底删除</h3><p class="text-gray-500 dark:text-gray-400 mb-6">彻底删除 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ pendingPermItem?.title }}"</span> 将无法找回，确认？</p><div class="flex justify-end space-x-3"><button @click="showPermDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button><button @click="confirmPermDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">彻底删除</button></div></div></div>
   </div>
 </template>
 
@@ -150,6 +95,9 @@ import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Clipboard } from '@capacitor/clipboard';
 import localforage from 'localforage';
 import { renderMarkdown } from './utils/core';
+
+// 【导入解耦引擎】
+import { useSyncEngine } from './composables/useSyncEngine';
 
 import HomeView from './components/HomeView.vue';
 import AlgoView from './components/AlgoView.vue';
@@ -173,20 +121,12 @@ const defaultAppSpace = ref('tech');
 const activeTypeMode = ref('all'); 
 const sortMode = ref('time'); 
 
-// === 核心状态 ===
 const isDarkMode = ref(false); 
 const isTocOpen = ref(false); 
-const contentFontSize = ref(18); // 默认正文字号: 18px
+const contentFontSize = ref(18); 
 
-// 动态字号引擎
-const increaseFontSize = async () => {
-  if (contentFontSize.value < 32) contentFontSize.value += 2;
-  await localforage.setItem('font-size', contentFontSize.value);
-};
-const decreaseFontSize = async () => {
-  if (contentFontSize.value > 12) contentFontSize.value -= 2;
-  await localforage.setItem('font-size', contentFontSize.value);
-};
+const increaseFontSize = async () => { if (contentFontSize.value < 32) contentFontSize.value += 2; await localforage.setItem('font-size', contentFontSize.value); };
+const decreaseFontSize = async () => { if (contentFontSize.value > 12) contentFontSize.value -= 2; await localforage.setItem('font-size', contentFontSize.value); };
 
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
@@ -198,9 +138,6 @@ const showDeleteConfirm = ref(false);
 const showTrashModal = ref(false);
 const showUserCenter = ref(false); 
 const showImportModal = ref(false);
-const isSyncing = ref(false);
-const savedGithubUrl = ref('');
-
 const itemToDelete = ref(null);
 const showActionMenu = ref(false);
 const actionItem = ref(null);
@@ -211,178 +148,33 @@ const handleBulkDeleteRequest = (ids) => { pendingBulkIds.value = ids; showBulkD
 const confirmBulkDelete = async () => {
   const itemsToDelete = algorithms.value.filter(a => pendingBulkIds.value.includes(a.id));
   algorithms.value = algorithms.value.filter(a => !pendingBulkIds.value.includes(a.id));
-  trashList.value.unshift(...itemsToDelete);
-  extractAndSyncCategories(); await saveToDisk();
+  trashList.value.unshift(...itemsToDelete); extractAndSyncCategories(); await saveToDisk();
   showBulkDeleteConfirm.value = false; homeViewRef.value?.exitBulkMode();
 };
 
 const showEmptyTrashConfirm = ref(false);
 const handleEmptyTrashRequest = () => { showEmptyTrashConfirm.value = true; };
 const confirmEmptyTrash = async () => { trashList.value = []; await saveToDisk(); showEmptyTrashConfirm.value = false; };
-
 const showPermDeleteConfirm = ref(false);
 const pendingPermItem = ref(null);
 const handlePermDeleteRequest = (item) => { pendingPermItem.value = item; showPermDeleteConfirm.value = true; };
 const confirmPermDelete = async () => { trashList.value = trashList.value.filter(a => a.id !== pendingPermItem.value.id); await saveToDisk(); showPermDeleteConfirm.value = false; };
 
-const upsertItem = (newItem) => {
-  const existingIdx = algorithms.value.findIndex(a => a.title === newItem.title);
-  if (existingIdx >= 0) { algorithms.value[existingIdx] = { ...algorithms.value[existingIdx], ...newItem, id: algorithms.value[existingIdx].id }; return 'updated'; } 
-  else { algorithms.value.unshift(newItem); return 'inserted'; }
-};
-
-const handleGithubSync = async (baseUrl) => {
-  if (!baseUrl) return alert("请输入 GitHub 地址！");
-  isSyncing.value = true; savedGithubUrl.value = baseUrl; await localforage.setItem('github-sync-url', baseUrl);
-  try {
-    let cleanBase = baseUrl.trim(); if (cleanBase.endsWith('/')) cleanBase = cleanBase.slice(0, -1);
-    if (cleanBase.includes('github.com') && cleanBase.includes('/tree/')) cleanBase = cleanBase.replace('github.com', 'raw.githubusercontent.com').replace('/tree/', '/');
-    const res = await fetch(`${cleanBase}/data.json?t=${Date.now()}`);
-    if (!res.ok) throw new Error("无法读取 data.json");
-    const remoteData = await res.json();
-    let importedCount = 0; let updatedCount = 0;
-    const localizeImages = async (text, imagesObj) => {
-      if (!text) return text; let newText = text;
-      const regex = /\/images\/(img_[A-Za-z0-9_.-]+)/g; const matches = [...newText.matchAll(regex)];
-      for (const m of matches) {
-        const fullPath = m[0]; const imgIdWithExt = m[1]; const imgId = imgIdWithExt.split('.')[0]; 
-        if (!imagesObj[imgId]) {
-          try {
-            const imgRes = await fetch(`${cleanBase}${fullPath}`); const blob = await imgRes.blob();
-            const base64 = await new Promise(resolve => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); });
-            imagesObj[imgId] = base64; 
-          } catch(e) { console.error('图片下载失败', fullPath); }
-        }
-        newText = newText.replace(fullPath, `local:${imgId}`);
-      } return newText;
-    };
-    for (const item of remoteData) {
-      if (!item.images) item.images = {};
-      item.problemText = await localizeImages(item.problemText, item.images);
-      item.solutionText = await localizeImages(item.solutionText, item.images);
-      const status = upsertItem(item);
-      if (status === 'inserted') importedCount++; if (status === 'updated') updatedCount++;
-    }
-    extractAndSyncCategories(); await saveToDisk();
-    alert(`🐙 GitHub 同步成功！\n新增: ${importedCount} 条\n更新: ${updatedCount} 条\n图文已转为离线缓存。`); showImportModal.value = false;
-  } catch (e) { alert(`拉取失败！\n原因: ${e.message}`); } finally { isSyncing.value = false; }
-};
-
-const handleMarkdownImport = async (file) => {
-  try {
-    const text = await file.text(); const blocks = text.split('\n---').filter(i => i.trim().length > 0);
-    let importedCount = 0; let updatedCount = 0;
-    blocks.forEach(block => {
-      const titleMatch = block.match(/##\s+(.*)/); if (!titleMatch) return;
-      const title = titleMatch[1].trim(); const metaMatch = block.match(/>\s+标签:\s+(.*?)\s+\|\s+类型:\s+(.*)/);
-      const category = metaMatch ? metaMatch[1].trim() : '未分类'; const type = metaMatch ? metaMatch[2].trim() : 'algorithm';
-      let problemText = ''; let solutionText = ''; let language = 'python';
-      const descMatch = block.match(/### 描述\/内容\n([\s\S]*?)(?=### 代码\/解析|$)/); if (descMatch) problemText = descMatch[1].trim();
-      const codeBlockMatch = block.match(/### 代码\/解析\n```([\w]*)\n([\s\S]*?)```/);
-      if (codeBlockMatch) { language = codeBlockMatch[1] || 'python'; solutionText = codeBlockMatch[2].trim(); }
-      const newItem = { id: Date.now().toString() + Math.floor(Math.random()*100), type, title, category, difficulty: '中等', language, problemText, solutionText, images: {}, isPinned: false };
-      const status = upsertItem(newItem); if (status === 'inserted') importedCount++; if (status === 'updated') updatedCount++;
-    });
-    extractAndSyncCategories(); await saveToDisk(); alert(`📝 解析完成！新增: ${importedCount} 篇，更新: ${updatedCount} 篇`); showImportModal.value = false;
-  } catch (e) { alert("文件读取失败！"); }
-};
-
-const handleClipboardImport = async () => {
-  try {
-    const { value } = await Clipboard.read(); if (!value) return alert("剪贴板为空！");
-    let lcpObj; try { lcpObj = JSON.parse(value); } catch (e) { return alert("剪贴板内容非有效 LCP 格式。"); }
-    if (!lcpObj.lcp_version) return alert("无法识别的版本或数据损坏。");
-    const newItem = {
-      id: Date.now().toString(), type: lcpObj.type || 'algorithm', title: lcpObj.metadata?.title || '未命名导入', category: lcpObj.metadata?.category || '默认分类',
-      isPinned: false, difficulty: lcpObj.payload?.difficulty || '中等', language: lcpObj.payload?.language || 'python',
-      problemText: lcpObj.payload?.problemText || '', solutionText: lcpObj.payload?.solutionText || '', images: lcpObj.assets || {}
-    };
-    const status = upsertItem(newItem); extractAndSyncCategories(); await saveToDisk();
-    alert(`🎉 成功导入: ${newItem.title}`); showImportModal.value = false;
-  } catch (e) { alert("导入失败，请检查权限。"); }
-};
-
-const algoCount = computed(() => algorithms.value.filter(a => a.type === 'algorithm').length);
-const interviewCount = computed(() => algorithms.value.filter(a => a.type === 'interview').length);
-const diaryCount = computed(() => algorithms.value.filter(a => a.type === 'diary').length);
-const journalCount = computed(() => algorithms.value.filter(a => a.type === 'journal').length);
-
-const handleModeChange = (mode) => { activeTypeMode.value = mode; activeCategory.value = '全部'; };
-const toggleAppSpace = () => { appSpace.value = appSpace.value === 'tech' ? 'life' : 'tech'; activeTypeMode.value = 'all'; activeCategory.value = '全部'; showUserCenter.value = false; };
-const toggleDefaultSpace = async () => { defaultAppSpace.value = defaultAppSpace.value === 'tech' ? 'life' : 'tech'; await localforage.setItem('default-app-space', defaultAppSpace.value); };
-const toggleSort = async () => { sortMode.value = sortMode.value === 'time' ? 'title' : 'time'; await localforage.setItem('sort-mode', sortMode.value); };
-
-const toggleDarkMode = async () => {
-  isDarkMode.value = !isDarkMode.value;
-  if (isDarkMode.value) document.documentElement.classList.add('dark');
-  else document.documentElement.classList.remove('dark');
-  await localforage.setItem('dark-mode', isDarkMode.value);
-};
-const toggleToc = async () => {
-  isTocOpen.value = !isTocOpen.value;
-  await localforage.setItem('toc-open', isTocOpen.value);
-};
-
-const resolveImagesForExport = (text, images = {}) => { if (!text) return ''; return text.replace(/\]\(local:([^)]+)\)/g, (match, imgId) => `](${images[imgId] || ''})`); };
-const inlineImagesForExport = async (text, images = {}) => {
-  if (!text) return ''; let processedText = text; processedText = processedText.replace(/\]\(local:([^)]+)\)/g, (match, imgId) => `](${images[imgId] || ''})`);
-  const regex = /\/images\/img_[A-Za-z0-9_.-]+/g; const matches = processedText.match(regex);
-  if (matches) {
-    const uniqueUrls = [...new Set(matches)];
-    for (const url of uniqueUrls) {
-      try { const response = await fetch(url); const blob = await response.blob(); const base64 = await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); }); processedText = processedText.split(url).join(base64); } catch (e) { processedText = processedText.split(url).join(window.location.origin + url); }
-    }
-  } return processedText;
-};
-
-const handleExportData = async (format, scope) => {
-  let listToExport = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type));
-  if (scope !== 'all') listToExport = listToExport.filter(a => a.type === scope);
-  if (listToExport.length === 0) return alert("当前选择范围内没有可导出的数据！");
-  const loadingToast = document.createElement('div');
-  loadingToast.innerHTML = '<div style="position:fixed;top:40px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;padding:12px 24px;border-radius:30px;z-index:99999;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);font-weight:bold;animation:pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;">📦 正在打包图文资源...</div>';
-  document.body.appendChild(loadingToast);
-  try {
-    if (format === 'md') {
-      let mdContent = `# Let Code in Pad - 导出归档\n\n`;
-      for (const item of listToExport) {
-        mdContent += `## ${item.title}\n> 标签: ${item.category} | 类型: ${item.type}\n\n`;
-        let pText = await inlineImagesForExport(item.problemText, item.images); let sText = await inlineImagesForExport(item.solutionText, item.images);
-        if (pText) mdContent += `### 描述/内容\n${pText}\n\n`; if (sText) mdContent += `### 代码/解析\n\`\`\`${item.language || ''}\n${sText}\n\`\`\`\n\n`;
-        mdContent += `---\n\n`;
-      }
-      const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' }); const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `LCP_Export_${appSpace.value}_${Date.now()}.md`; a.click(); URL.revokeObjectURL(url);
-    } else if (format === 'pdf') {
-      let htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>导出 PDF - Let Code in Pad</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-        <style>body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; color: #333; max-width: 900px; margin: 0 auto;} h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 50px; page-break-after: avoid; } .meta { color: #888; font-size: 0.9em; margin-bottom: 20px; } pre { background: #f8f9fa; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; font-family: monospace; } img { max-width: 100%; border-radius: 8px; margin: 15px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } hr { border: none; border-top: 4px dashed #ddd; margin: 60px 0; } @media print { hr { page-break-after: always; border: none; margin: 0; } } .katex-display { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.5rem; }</style></head><body>`;
-      for (const item of listToExport) {
-        htmlContent += `<h1>${item.title}</h1><div class="meta">标签: ${item.category} | 类型: ${item.type}</div>`;
-        let pText = await inlineImagesForExport(item.problemText, item.images); let sText = await inlineImagesForExport(item.solutionText, item.images);
-        htmlContent += `<div>${renderMarkdown(pText)}</div>`;
-        if (sText) { let formattedSolution = sText.includes('```') ? sText : `\`\`\`${item.language || ''}\n${sText}\n\`\`\``; htmlContent += `<div>${renderMarkdown(formattedSolution)}</div>`; }
-        htmlContent += `<hr/>`;
-      }
-      htmlContent += "\x3Cscript\x3Ewindow.onload = () => { setTimeout(()=>window.print(), 800); }\x3C/script\x3E</body></html>";
-      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' }); const url = URL.createObjectURL(blob); window.open(url, '_blank');
-    }
-  } catch (err) { alert("导出时发生错误。"); } finally { if (document.body.contains(loadingToast)) document.body.removeChild(loadingToast); }
-};
-
-const packageToLCP = (item) => { return JSON.stringify({ lcp_version: "1.0", type: item.type || "algorithm", metadata: { id: item.id || Date.now().toString(), title: item.title, category: item.category, isPinned: !!item.isPinned }, payload: { difficulty: item.difficulty, language: item.language, problemText: item.problemText, solutionText: item.solutionText }, assets: item.images || {} }); };
-const handleShareData = async (item) => { try { await Clipboard.write({ string: packageToLCP(item) }); showActionMenu.value = false; alert("📦 数据包已复制！可供其他设备一键导入。"); } catch (e) { console.error(e); } };
-
-const openActionMenu = (item) => { actionItem.value = item; showActionMenu.value = true; };
-const togglePin = async (item) => { const idx = algorithms.value.findIndex(a => a.id === item.id); if (idx !== -1) { algorithms.value[idx].isPinned = !algorithms.value[idx].isPinned; showActionMenu.value = false; await saveToDisk(); } };
-const handleMenuEdit = (item) => { showActionMenu.value = false; selectedAlgo.value = item; startEdit(); };
-const handleMenuDelete = (item) => { showActionMenu.value = false; triggerDelete(item); };
-const triggerDelete = (item) => { itemToDelete.value = item; showDeleteConfirm.value = true; };
-const confirmDelete = async () => { const item = itemToDelete.value; algorithms.value = algorithms.value.filter(a => a.id !== item.id); trashList.value.unshift(item); showDeleteConfirm.value = false; extractAndSyncCategories(); await saveToDisk(); if (selectedAlgo.value?.id === item.id) goBack(); };
-const restoreItem = async (item) => { trashList.value = trashList.value.filter(a => a.id !== item.id); algorithms.value.unshift(item); extractAndSyncCategories(); await saveToDisk(); };
-
 const getCategories = (catStr) => { if (!catStr) return ['未分类']; const cats = catStr.split(/[\s,，]+/).filter(Boolean); return cats.length > 0 ? cats : ['未分类']; };
 const extractAndSyncCategories = () => { const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category))); const ordered = customCatOrder.value.filter(c => allCats.has(c)); const unordered = Array.from(allCats).filter(c => !ordered.includes(c)); customCatOrder.value = [...ordered, ...unordered]; };
+
+const saveToDisk = async () => {
+  try {
+    const pureData = JSON.parse(JSON.stringify(algorithms.value));
+    await localforage.setItem('algo-data', pureData); await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value))); await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value))); await localforage.setItem('cat-colors', JSON.parse(JSON.stringify(customCatColors.value)));
+    if (!Capacitor.isNativePlatform()) { await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {}); }
+  } catch (e) { console.error(e); }
+};
+
+// 【挂载解耦逻辑】
+const { isSyncing, savedGithubUrl, handleGithubSync, handleMarkdownImport, handleClipboardImport, handleExportData } = useSyncEngine({
+  algorithms, trashList, extractAndSyncCategories, saveToDisk, appSpace, showImportModal
+});
 
 const loadData = async () => {
   try {
@@ -395,27 +187,14 @@ const loadData = async () => {
     
     const savedDarkMode = await localforage.getItem('dark-mode'); 
     if (savedDarkMode) { isDarkMode.value = savedDarkMode; if(isDarkMode.value) document.documentElement.classList.add('dark'); }
-
-    const savedTocOpen = await localforage.getItem('toc-open');
-    if (savedTocOpen !== null) isTocOpen.value = savedTocOpen;
-
-    // 读取缓存的字号，应用于所有的内容组件
-    const savedFontSize = await localforage.getItem('font-size');
-    if (savedFontSize) contentFontSize.value = savedFontSize;
+    const savedTocOpen = await localforage.getItem('toc-open'); if (savedTocOpen !== null) isTocOpen.value = savedTocOpen;
+    const savedFontSize = await localforage.getItem('font-size'); if (savedFontSize) contentFontSize.value = savedFontSize;
 
     let dataToUse = null; const isNative = Capacitor.isNativePlatform();
     if (isNative) { ScreenOrientation.lock({ orientation: 'landscape' }).catch(() => {}); const localData = await localforage.getItem('algo-data'); if (localData && localData.length > 0) dataToUse = localData; }
     if (!dataToUse || !isNative) { const res = await fetch('/data.json?t=' + Date.now()); if (res.ok) dataToUse = await res.json(); }
     if (dataToUse) { algorithms.value = dataToUse.map(item => ({ type: item.type || 'algorithm', isPinned: !!item.isPinned, ...item })); extractAndSyncCategories(); await localforage.setItem('algo-data', algorithms.value); }
   } catch (e) { console.error("数据加载失败", e); }
-};
-
-const saveToDisk = async () => {
-  try {
-    const pureData = JSON.parse(JSON.stringify(algorithms.value));
-    await localforage.setItem('algo-data', pureData); await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value))); await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value))); await localforage.setItem('cat-colors', JSON.parse(JSON.stringify(customCatColors.value)));
-    if (!Capacitor.isNativePlatform()) { await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {}); }
-  } catch (e) { console.error(e); }
 };
 
 const updateCatColor = async (cat, color) => { customCatColors.value[cat] = color; await saveToDisk(); };
@@ -468,4 +247,12 @@ const saveAlgo = async () => {
   isEditing.value = false;
   await saveToDisk();
 };
+
+const openActionMenu = (item) => { actionItem.value = item; showActionMenu.value = true; };
+const togglePin = async (item) => { const idx = algorithms.value.findIndex(a => a.id === item.id); if (idx !== -1) { algorithms.value[idx].isPinned = !algorithms.value[idx].isPinned; showActionMenu.value = false; await saveToDisk(); } };
+const handleMenuEdit = (item) => { showActionMenu.value = false; selectedAlgo.value = item; startEdit(); };
+const handleMenuDelete = (item) => { showActionMenu.value = false; triggerDelete(item); };
+const toggleDarkMode = async () => { isDarkMode.value = !isDarkMode.value; if (isDarkMode.value) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); await localforage.setItem('dark-mode', isDarkMode.value); };
+const toggleToc = async () => { isTocOpen.value = !isTocOpen.value; await localforage.setItem('toc-open', isTocOpen.value); };
+const handleShareData = async (item) => { try { await Clipboard.write({ string: JSON.stringify({ lcp_version: "1.0", type: item.type || "algorithm", metadata: { id: item.id || Date.now().toString(), title: item.title, category: item.category, isPinned: !!item.isPinned }, payload: { difficulty: item.difficulty, language: item.language, problemText: item.problemText, solutionText: item.solutionText }, assets: item.images || {} }) }); showActionMenu.value = false; alert("📦 数据包已复制！可供其他设备一键导入。"); } catch (e) { console.error(e); } };
 </script>
