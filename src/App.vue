@@ -94,9 +94,8 @@ import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Clipboard } from '@capacitor/clipboard';
 import localforage from 'localforage';
-import { renderMarkdown } from './utils/core';
 
-// 【导入解耦引擎】
+// 引入解耦后的同步引擎组件
 import { useSyncEngine } from './composables/useSyncEngine';
 
 import HomeView from './components/HomeView.vue';
@@ -111,6 +110,7 @@ import TrashModal from './components/TrashModal.vue';
 import UserCenterModal from './components/UserCenterModal.vue';
 import ImportSyncModal from './components/ImportSyncModal.vue';
 
+// ================== 1. 核心状态 ==================
 const homeViewRef = ref(null);
 const algorithms = ref([]);
 const trashList = ref([]); 
@@ -125,15 +125,13 @@ const isDarkMode = ref(false);
 const isTocOpen = ref(false); 
 const contentFontSize = ref(18); 
 
-const increaseFontSize = async () => { if (contentFontSize.value < 32) contentFontSize.value += 2; await localforage.setItem('font-size', contentFontSize.value); };
-const decreaseFontSize = async () => { if (contentFontSize.value > 12) contentFontSize.value -= 2; await localforage.setItem('font-size', contentFontSize.value); };
-
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
 const customCatOrder = ref([]); 
 const customCatColors = ref({}); 
 const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false });
 
+// ================== 2. 弹窗控制状态 ==================
 const showDeleteConfirm = ref(false);
 const showTrashModal = ref(false);
 const showUserCenter = ref(false); 
@@ -144,6 +142,55 @@ const actionItem = ref(null);
 
 const showBulkDeleteConfirm = ref(false);
 const pendingBulkIds = ref([]);
+const showEmptyTrashConfirm = ref(false);
+const showPermDeleteConfirm = ref(false);
+const pendingPermItem = ref(null);
+
+// ================== 3. 底层辅助与本地保存引擎 ==================
+const getCategories = (catStr) => { if (!catStr) return ['未分类']; const cats = catStr.split(/[\s,，]+/).filter(Boolean); return cats.length > 0 ? cats : ['未分类']; };
+const extractAndSyncCategories = () => { const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category))); const ordered = customCatOrder.value.filter(c => allCats.has(c)); const unordered = Array.from(allCats).filter(c => !ordered.includes(c)); customCatOrder.value = [...ordered, ...unordered]; };
+
+const saveToDisk = async () => {
+  try {
+    const pureData = JSON.parse(JSON.stringify(algorithms.value));
+    await localforage.setItem('algo-data', pureData); 
+    await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value))); 
+    await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value))); 
+    await localforage.setItem('cat-colors', JSON.parse(JSON.stringify(customCatColors.value)));
+    if (!Capacitor.isNativePlatform()) { await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {}); }
+  } catch (e) { console.error(e); }
+};
+
+// ================== 4. 挂载抽离出的同步与导入功能 ==================
+const { 
+  isSyncing, savedGithubUrl, handleGithubSync, 
+  handleMarkdownImport, handleClipboardImport, handleExportData 
+} = useSyncEngine({ algorithms, trashList, extractAndSyncCategories, saveToDisk, appSpace, showImportModal });
+
+// ================== 5. 全局基础功能 (模式/主题/字号) ==================
+const increaseFontSize = async () => { if (contentFontSize.value < 32) contentFontSize.value += 2; await localforage.setItem('font-size', contentFontSize.value); };
+const decreaseFontSize = async () => { if (contentFontSize.value > 12) contentFontSize.value -= 2; await localforage.setItem('font-size', contentFontSize.value); };
+
+const toggleDarkMode = async () => {
+  isDarkMode.value = !isDarkMode.value;
+  if (isDarkMode.value) document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+  await localforage.setItem('dark-mode', isDarkMode.value);
+};
+
+const toggleToc = async () => {
+  isTocOpen.value = !isTocOpen.value;
+  await localforage.setItem('toc-open', isTocOpen.value);
+};
+
+const handleModeChange = (mode) => { activeTypeMode.value = mode; activeCategory.value = '全部'; };
+const toggleAppSpace = () => { appSpace.value = appSpace.value === 'tech' ? 'life' : 'tech'; activeTypeMode.value = 'all'; activeCategory.value = '全部'; showUserCenter.value = false; };
+const toggleDefaultSpace = async () => { defaultAppSpace.value = defaultAppSpace.value === 'tech' ? 'life' : 'tech'; await localforage.setItem('default-app-space', defaultAppSpace.value); };
+const toggleSort = async () => { sortMode.value = sortMode.value === 'time' ? 'title' : 'time'; await localforage.setItem('sort-mode', sortMode.value); };
+const updateCatColor = async (cat, color) => { customCatColors.value[cat] = color; await saveToDisk(); };
+const moveCategory = (index, direction) => { const targetIndex = index + direction; if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return; const temp = customCatOrder.value[index]; customCatOrder.value[index] = customCatOrder.value[targetIndex]; customCatOrder.value[targetIndex] = temp; };
+
+// ================== 6. 批量操作与回收站管理 ==================
 const handleBulkDeleteRequest = (ids) => { pendingBulkIds.value = ids; showBulkDeleteConfirm.value = true; };
 const confirmBulkDelete = async () => {
   const itemsToDelete = algorithms.value.filter(a => pendingBulkIds.value.includes(a.id));
@@ -152,30 +199,75 @@ const confirmBulkDelete = async () => {
   showBulkDeleteConfirm.value = false; homeViewRef.value?.exitBulkMode();
 };
 
-const showEmptyTrashConfirm = ref(false);
 const handleEmptyTrashRequest = () => { showEmptyTrashConfirm.value = true; };
 const confirmEmptyTrash = async () => { trashList.value = []; await saveToDisk(); showEmptyTrashConfirm.value = false; };
-const showPermDeleteConfirm = ref(false);
-const pendingPermItem = ref(null);
+
 const handlePermDeleteRequest = (item) => { pendingPermItem.value = item; showPermDeleteConfirm.value = true; };
 const confirmPermDelete = async () => { trashList.value = trashList.value.filter(a => a.id !== pendingPermItem.value.id); await saveToDisk(); showPermDeleteConfirm.value = false; };
 
-const getCategories = (catStr) => { if (!catStr) return ['未分类']; const cats = catStr.split(/[\s,，]+/).filter(Boolean); return cats.length > 0 ? cats : ['未分类']; };
-const extractAndSyncCategories = () => { const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category))); const ordered = customCatOrder.value.filter(c => allCats.has(c)); const unordered = Array.from(allCats).filter(c => !ordered.includes(c)); customCatOrder.value = [...ordered, ...unordered]; };
+const restoreItem = async (item) => { trashList.value = trashList.value.filter(a => a.id !== item.id); algorithms.value.unshift(item); extractAndSyncCategories(); await saveToDisk(); };
+const triggerDelete = (item) => { itemToDelete.value = item; showDeleteConfirm.value = true; };
+const confirmDelete = async () => { const item = itemToDelete.value; algorithms.value = algorithms.value.filter(a => a.id !== item.id); trashList.value.unshift(item); showDeleteConfirm.value = false; extractAndSyncCategories(); await saveToDisk(); if (selectedAlgo.value?.id === item.id) goBack(); };
 
-const saveToDisk = async () => {
-  try {
-    const pureData = JSON.parse(JSON.stringify(algorithms.value));
-    await localforage.setItem('algo-data', pureData); await localforage.setItem('algo-trash', JSON.parse(JSON.stringify(trashList.value))); await localforage.setItem('cat-order', JSON.parse(JSON.stringify(customCatOrder.value))); await localforage.setItem('cat-colors', JSON.parse(JSON.stringify(customCatColors.value)));
-    if (!Capacitor.isNativePlatform()) { await fetch('/api/save', { method: 'POST', body: JSON.stringify(pureData) }).catch(() => {}); }
-  } catch (e) { console.error(e); }
+// ================== 7. 视图导航与内容操作 ==================
+const openActionMenu = (item) => { actionItem.value = item; showActionMenu.value = true; };
+const togglePin = async (item) => { const idx = algorithms.value.findIndex(a => a.id === item.id); if (idx !== -1) { algorithms.value[idx].isPinned = !algorithms.value[idx].isPinned; showActionMenu.value = false; await saveToDisk(); } };
+const handleMenuEdit = (item) => { showActionMenu.value = false; selectedAlgo.value = item; startEdit(); };
+const handleMenuDelete = (item) => { showActionMenu.value = false; triggerDelete(item); };
+
+const handleShareData = async (item) => { 
+  try { 
+    await Clipboard.write({ string: JSON.stringify({ lcp_version: "1.0", type: item.type || "algorithm", metadata: { id: item.id || Date.now().toString(), title: item.title, category: item.category, isPinned: !!item.isPinned }, payload: { difficulty: item.difficulty, language: item.language, problemText: item.problemText, solutionText: item.solutionText }, assets: item.images || {} }) }); 
+    showActionMenu.value = false; 
+    alert("📦 数据包已复制！可供其他设备一键导入。"); 
+  } catch (e) { console.error(e); } 
 };
 
-// 【挂载解耦逻辑】
-const { isSyncing, savedGithubUrl, handleGithubSync, handleMarkdownImport, handleClipboardImport, handleExportData } = useSyncEngine({
-  algorithms, trashList, extractAndSyncCategories, saveToDisk, appSpace, showImportModal
+const startView = (item) => { selectedAlgo.value = item; isEditing.value = false; };
+const createNew = () => { editForm.value = { id: Date.now().toString(), title: '', category: '', type: appSpace.value === 'tech' ? 'algorithm' : 'diary', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false }; selectedAlgo.value = null; isEditing.value = true; };
+const startEdit = () => { editForm.value = JSON.parse(JSON.stringify(selectedAlgo.value)); if (!editForm.value.images) editForm.value.images = {}; if (!editForm.value.type) editForm.value.type = appSpace.value === 'tech' ? 'algorithm' : 'diary'; isEditing.value = true; };
+
+const saveAlgo = async () => {
+  if (!editForm.value.title) return alert("标题不能为空！");
+  const newItem = JSON.parse(JSON.stringify(editForm.value));
+  const index = algorithms.value.findIndex(a => a.id === newItem.id);
+  if (index >= 0) algorithms.value[index] = newItem; else algorithms.value.unshift(newItem);
+  extractAndSyncCategories(); 
+  selectedAlgo.value = algorithms.value.find(a => a.id === newItem.id);
+  isEditing.value = false;
+  await saveToDisk();
+};
+
+const goBack = () => { selectedAlgo.value = null; isEditing.value = false; };
+const goPrev = () => { if (hasPrev.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value - 1]; }; 
+const goNext = () => { if (hasNext.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value + 1]; };
+
+// ================== 8. 计算属性 ==================
+const algoCount = computed(() => algorithms.value.filter(a => a.type === 'algorithm').length);
+const interviewCount = computed(() => algorithms.value.filter(a => a.type === 'interview').length);
+const diaryCount = computed(() => algorithms.value.filter(a => a.type === 'diary').length);
+const journalCount = computed(() => algorithms.value.filter(a => a.type === 'journal').length);
+
+const activeModeCategories = computed(() => { let listForCats = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type)); if (activeTypeMode.value !== 'all') listForCats = listForCats.filter(a => a.type === activeTypeMode.value); const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category))); const displayCats = customCatOrder.value.filter(c => currentModeCats.has(c)); return ['全部', ...displayCats]; });
+const sortedFilteredAlgorithms = computed(() => {
+  let list = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type));
+  if (activeTypeMode.value !== 'all') list = list.filter(a => a.type === activeTypeMode.value);
+  if (activeCategory.value !== '全部') list = list.filter(a => getCategories(a.category).includes(activeCategory.value));
+  return list.slice().sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1; if (!a.isPinned && b.isPinned) return 1;
+    if (sortMode.value === 'time') return parseInt(b.id) - parseInt(a.id); 
+    const numA = a.title.match(/^\d+/) ? parseInt(a.title.match(/^\d+/)[0], 10) : Number.MAX_SAFE_INTEGER;
+    const numB = b.title.match(/^\d+/) ? parseInt(b.title.match(/^\d+/)[0], 10) : Number.MAX_SAFE_INTEGER;
+    if (numA !== numB) return numA - numB; return a.title.localeCompare(b.title);
+  });
 });
 
+const difficultyColor = (diff) => diff === '简单' ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' : diff === '中等' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-500' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400';
+const currentIndex = computed(() => !selectedAlgo.value ? -1 : sortedFilteredAlgorithms.value.findIndex(a => a.id === selectedAlgo.value.id));
+const hasPrev = computed(() => currentIndex.value > 0); 
+const hasNext = computed(() => currentIndex.value !== -1 && currentIndex.value < sortedFilteredAlgorithms.value.length - 1);
+
+// ================== 9. 初始化与生命周期 ==================
 const loadData = async () => {
   try {
     const savedUrl = await localforage.getItem('github-sync-url'); if (savedUrl) savedGithubUrl.value = savedUrl;
@@ -197,8 +289,6 @@ const loadData = async () => {
   } catch (e) { console.error("数据加载失败", e); }
 };
 
-const updateCatColor = async (cat, color) => { customCatColors.value[cat] = color; await saveToDisk(); };
-
 onMounted(() => {
   loadData();
   CapApp.addListener('backButton', () => {
@@ -214,45 +304,4 @@ onMounted(() => {
     else if (selectedAlgo.value || isEditing.value) goBack(); else CapApp.exitApp();
   });
 });
-
-const moveCategory = (index, direction) => { const targetIndex = index + direction; if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return; const temp = customCatOrder.value[index]; customCatOrder.value[index] = customCatOrder.value[targetIndex]; customCatOrder.value[targetIndex] = temp; };
-const activeModeCategories = computed(() => { let listForCats = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type)); if (activeTypeMode.value !== 'all') listForCats = listForCats.filter(a => a.type === activeTypeMode.value); const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category))); const displayCats = customCatOrder.value.filter(c => currentModeCats.has(c)); return ['全部', ...displayCats]; });
-const sortedFilteredAlgorithms = computed(() => {
-  let list = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type));
-  if (activeTypeMode.value !== 'all') list = list.filter(a => a.type === activeTypeMode.value);
-  if (activeCategory.value !== '全部') list = list.filter(a => getCategories(a.category).includes(activeCategory.value));
-  return list.slice().sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1; if (!a.isPinned && b.isPinned) return 1;
-    if (sortMode.value === 'time') return parseInt(b.id) - parseInt(a.id); 
-    const numA = a.title.match(/^\d+/) ? parseInt(a.title.match(/^\d+/)[0], 10) : Number.MAX_SAFE_INTEGER;
-    const numB = b.title.match(/^\d+/) ? parseInt(b.title.match(/^\d+/)[0], 10) : Number.MAX_SAFE_INTEGER;
-    if (numA !== numB) return numA - numB; return a.title.localeCompare(b.title);
-  });
-});
-
-const difficultyColor = (diff) => diff === '简单' ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' : diff === '中等' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-500' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400';
-const currentIndex = computed(() => !selectedAlgo.value ? -1 : sortedFilteredAlgorithms.value.findIndex(a => a.id === selectedAlgo.value.id));
-const hasPrev = computed(() => currentIndex.value > 0); const hasNext = computed(() => currentIndex.value !== -1 && currentIndex.value < sortedFilteredAlgorithms.value.length - 1);
-const goPrev = () => { if (hasPrev.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value - 1]; }; const goNext = () => { if (hasNext.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value + 1]; }; const goBack = () => { selectedAlgo.value = null; isEditing.value = false; }; const startView = (item) => { selectedAlgo.value = item; isEditing.value = false; };
-const createNew = () => { editForm.value = { id: Date.now().toString(), title: '', category: '', type: appSpace.value === 'tech' ? 'algorithm' : 'diary', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false }; selectedAlgo.value = null; isEditing.value = true; };
-const startEdit = () => { editForm.value = JSON.parse(JSON.stringify(selectedAlgo.value)); if (!editForm.value.images) editForm.value.images = {}; if (!editForm.value.type) editForm.value.type = appSpace.value === 'tech' ? 'algorithm' : 'diary'; isEditing.value = true; };
-
-const saveAlgo = async () => {
-  if (!editForm.value.title) return alert("标题不能为空！");
-  const newItem = JSON.parse(JSON.stringify(editForm.value));
-  const index = algorithms.value.findIndex(a => a.id === newItem.id);
-  if (index >= 0) algorithms.value[index] = newItem; else algorithms.value.unshift(newItem);
-  extractAndSyncCategories(); 
-  selectedAlgo.value = algorithms.value.find(a => a.id === newItem.id);
-  isEditing.value = false;
-  await saveToDisk();
-};
-
-const openActionMenu = (item) => { actionItem.value = item; showActionMenu.value = true; };
-const togglePin = async (item) => { const idx = algorithms.value.findIndex(a => a.id === item.id); if (idx !== -1) { algorithms.value[idx].isPinned = !algorithms.value[idx].isPinned; showActionMenu.value = false; await saveToDisk(); } };
-const handleMenuEdit = (item) => { showActionMenu.value = false; selectedAlgo.value = item; startEdit(); };
-const handleMenuDelete = (item) => { showActionMenu.value = false; triggerDelete(item); };
-const toggleDarkMode = async () => { isDarkMode.value = !isDarkMode.value; if (isDarkMode.value) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); await localforage.setItem('dark-mode', isDarkMode.value); };
-const toggleToc = async () => { isTocOpen.value = !isTocOpen.value; await localforage.setItem('toc-open', isTocOpen.value); };
-const handleShareData = async (item) => { try { await Clipboard.write({ string: JSON.stringify({ lcp_version: "1.0", type: item.type || "algorithm", metadata: { id: item.id || Date.now().toString(), title: item.title, category: item.category, isPinned: !!item.isPinned }, payload: { difficulty: item.difficulty, language: item.language, problemText: item.problemText, solutionText: item.solutionText }, assets: item.images || {} }) }); showActionMenu.value = false; alert("📦 数据包已复制！可供其他设备一键导入。"); } catch (e) { console.error(e); } };
 </script>
