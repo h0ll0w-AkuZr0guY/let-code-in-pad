@@ -2,6 +2,9 @@ import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/vs2015.css';
 import TurndownService from 'turndown';
+// 【修复】引入现代增强版的 KaTeX 插件
+import markdownItKatex from '@iktakahiro/markdown-it-katex';
+import 'katex/dist/katex.min.css';
 
 // 1. Markdown 配置
 export const md = new MarkdownIt({
@@ -15,6 +18,9 @@ export const md = new MarkdownIt({
   }
 });
 
+// 【核心修复】：挂载新版 KaTeX，并关闭严格报错，防止个别语法错误导致整段白屏
+md.use(markdownItKatex, { throwOnError: false, errorColor: '#cc0000' });
+
 // 2. Turndown 配置 (富文本转 Markdown)
 export const turndownService = new TurndownService({
   headingStyle: 'atx',
@@ -22,8 +28,7 @@ export const turndownService = new TurndownService({
   emDelimiter: '*'
 });
 
-// 【核心修复 1】：彻底禁用 Turndown 的自动转义机制
-// 防止 > 和 [ ] 等符号前面被强行加上丑陋的反斜杠 \
+// 彻底禁用 Turndown 的自动转义机制
 turndownService.escape = function (string) {
   return string;
 };
@@ -60,7 +65,6 @@ export const handleSmartPaste = (event, reactiveObj, targetField) => {
     }, 10);
   };
 
-  // 优先处理图片提取
   const items = clipboardData.items;
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.indexOf('image') !== -1) {
@@ -79,34 +83,28 @@ export const handleSmartPaste = (event, reactiveObj, targetField) => {
     }
   }
 
-  // 获取剪贴板中的 HTML 和纯文本
   const htmlData = clipboardData.getData('text/html');
   const plainText = clipboardData.getData('text/plain');
   
   if (htmlData) {
-    // 【核心修复 2】：更聪明的代码环境侦测
-    // 判断是否是从 VS Code、LeetCode IDE 等代码编辑器复制的代码
-    const isFromIDE = htmlData.includes('vscode') || 
-                      htmlData.includes('monaco') || 
-                      htmlData.includes('CodeMirror') || 
-                      htmlData.includes('font-family: Consolas');
-    
-    // 判断是否真正包含具有排版意义的富文本标签
+    const isFromIDE = htmlData.includes('vscode') || htmlData.includes('monaco') || htmlData.includes('CodeMirror') || htmlData.includes('font-family: Consolas');
     const isRichText = /<(h[1-6]|b|strong|em|i|a|p|ul|li|table|blockquote)[^>]*>/i.test(htmlData);
 
-    // 【判断逻辑】：只有在确认为“富文本”且“非代码片段”时，才进行 Markdown 转换。
-    // 如果是纯代码，直接 let it go，让浏览器原封不动地粘贴纯文本（完美保留你的缩进和单行换行）
     if (isRichText && !isFromIDE && !plainText.match(/^```/)) {
       event.preventDefault();
       let markdown = turndownService.turndown(htmlData);
       
-      // 【核心修复 3】：去除加粗标记内部的多余空格（修复冒号共存时的解析失败）
-      // 将 "**输入: **" 自动修正为 "**输入:**"
-      markdown = markdown.replace(/\*\*([\s\S]*?)\*\*/g, (match, p1) => `**${p1.trim()}**`);
+      markdown = markdown.replace(/(\*\*|\*)([\s\S]*?)\1([a-zA-Z0-9\u4e00-\u9fa5_])/g, (match, symbol, p1, p2) => {
+          let inner = p1.replace(/\n+/g, ' ').trim();
+          return `${symbol}${inner}${symbol} ${p2}`;
+      });
+
+      markdown = markdown.replace(/(\*\*|\*)([\s\S]*?)\1/g, (match, symbol, p1) => {
+          let inner = p1.replace(/\n+/g, ' ').trim();
+          return `${symbol}${inner}${symbol}`;
+      });
       
-      // 剔除过多连续的冗余换行符
       markdown = markdown.replace(/\n{3,}/g, '\n\n');
-      
       insertTextAtCursor(event.target, markdown);
     }
   }

@@ -29,3 +29,15 @@ img { max-width: 100%; border-radius: 8px; margin-top: 1rem; margin-bottom: 1rem
 .dark .prose th, .dark .prose td { @apply border-gray-700; }
 
 .z-max { z-index: 99999 !important; }
+
+/* ================== LaTeX 数学公式显示优化 ================== */
+/* 防止超长公式撑爆屏幕并支持横向滚动 */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+}
+/* 深色模式下的数学公式色彩补全 */
+html.dark .katex {
+  color: #e5e7eb;
+}

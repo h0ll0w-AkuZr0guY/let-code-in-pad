@@ -316,7 +316,17 @@ const handleExportData = async (format, scope) => {
       const a = document.createElement('a'); a.href = url; a.download = `LCP_Export_${appSpace.value}_${Date.now()}.md`; a.click(); URL.revokeObjectURL(url);
     } else if (format === 'pdf') {
       let htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>导出 PDF - Let Code in Pad</title>
-        <style>body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; color: #333; max-width: 900px; margin: 0 auto;} h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 50px; page-break-after: avoid; } .meta { color: #888; font-size: 0.9em; margin-bottom: 20px; } pre { background: #f8f9fa; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; font-family: monospace; } img { max-width: 100%; border-radius: 8px; margin: 15px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } hr { border: none; border-top: 4px dashed #ddd; margin: 60px 0; } @media print { hr { page-break-after: always; border: none; margin: 0; } }</style></head><body>`;
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+        <style>
+          body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; color: #333; max-width: 900px; margin: 0 auto;} 
+          h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 50px; page-break-after: avoid; } 
+          .meta { color: #888; font-size: 0.9em; margin-bottom: 20px; } 
+          pre { background: #f8f9fa; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; font-family: monospace; } 
+          img { max-width: 100%; border-radius: 8px; margin: 15px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } 
+          hr { border: none; border-top: 4px dashed #ddd; margin: 60px 0; } 
+          @media print { hr { page-break-after: always; border: none; margin: 0; } }
+          .katex-display { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.5rem; }
+        </style></head><body>`;
       for (const item of listToExport) {
         htmlContent += `<h1>${item.title}</h1><div class="meta">标签: ${item.category} | 类型: ${item.type}</div>`;
         let pText = await inlineImagesForExport(item.problemText, item.images); let sText = await inlineImagesForExport(item.solutionText, item.images);
