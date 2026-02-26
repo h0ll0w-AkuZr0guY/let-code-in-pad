@@ -64,14 +64,12 @@
           {{ isDarkMode ? '切换浅色模式' : '切换深色模式' }}
         </span>
       </button>
-
       <button @click="$emit('toggleSort')" class="w-14 h-14 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full shadow-lg border border-gray-100 dark:border-gray-700 flex items-center justify-center text-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition group relative">
         {{ sortMode === 'time' ? '🕒' : '🔤' }}
         <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
           当前: {{ sortMode === 'time' ? '按创建时间排列' : '按自定义序号排列' }}
         </span>
       </button>
-
       <button @click="enterBulkMode" class="w-14 h-14 bg-blue-600 dark:bg-blue-500 rounded-full shadow-[0_4px_15px_rgba(37,99,235,0.4)] flex items-center justify-center text-white text-2xl hover:bg-blue-700 dark:hover:bg-blue-600 transition group relative">
         ☑️
         <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
@@ -98,20 +96,20 @@
     <div v-if="showOrderModal" class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
       <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[28rem] max-h-[85%] flex flex-col">
         <div class="flex justify-between items-center mb-6 border-b dark:border-gray-700 pb-3">
-          <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100">自定义标签 & 颜色</h3>
+          <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100">自定义标签排序 <span class="text-sm text-gray-400 font-normal ml-2">(长按≡拖拽)</span></h3>
           <button @click="closeOrderModal" class="text-gray-400 dark:text-gray-500 hover:text-red-500 font-bold text-2xl leading-none">✕</button>
         </div>
-        <div class="flex-1 overflow-y-auto space-y-3 pr-2">
-          <div v-for="(cat, index) in globalCategories" :key="cat" class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-3 rounded-xl border border-gray-100 dark:border-gray-600 shadow-sm transition">
+        
+        <div ref="sortableContainer" class="flex-1 overflow-y-auto space-y-3 pr-2 pb-4">
+          <div v-for="cat in globalCategories" :key="cat" class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-3 rounded-xl border border-gray-100 dark:border-gray-600 shadow-sm transition group cursor-grab active:cursor-grabbing">
             <div class="flex items-center space-x-4">
-              <div class="relative w-8 h-8 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-500 shrink-0 cursor-pointer hover:scale-110 transition-transform shadow-inner">
+              <div class="relative w-8 h-8 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-500 shrink-0 cursor-pointer hover:scale-110 transition-transform shadow-inner z-10">
                 <input type="color" :value="customCatColors[cat] || '#9ca3af'" @input="(e) => $emit('updateCatColor', cat, e.target.value)" class="absolute -top-4 -left-4 w-16 h-16 cursor-pointer" />
               </div>
-              <span class="font-bold text-gray-700 dark:text-gray-200 text-lg">{{ cat }}</span>
+              <span class="font-bold text-gray-700 dark:text-gray-200 text-lg select-none">{{ cat }}</span>
             </div>
-            <div class="space-x-2 flex">
-              <button @click="$emit('moveCat', index, -1)" :disabled="index === 0" class="w-8 h-8 flex items-center justify-center bg-white dark:bg-gray-600 border dark:border-gray-500 text-blue-600 dark:text-blue-300 rounded-lg disabled:opacity-30 disabled:bg-gray-100">↑</button>
-              <button @click="$emit('moveCat', index, 1)" :disabled="index === globalCategories.length - 1" class="w-8 h-8 flex items-center justify-center bg-white dark:bg-gray-600 border dark:border-gray-500 text-blue-600 dark:text-blue-300 rounded-lg disabled:opacity-30 disabled:bg-gray-100">↓</button>
+            <div class="text-gray-300 dark:text-gray-500 text-2xl px-2 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors pointer-events-none">
+              ≡
             </div>
           </div>
         </div>
@@ -121,13 +119,48 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
+import Sortable from 'sortablejs'; // 【新增依赖】
+
 const props = defineProps(['categories', 'globalCategories', 'activeCategory', 'activeTypeMode', 'appSpace', 'sortedList', 'getCategories', 'difficultyColor', 'customCatColors', 'sortMode', 'isDarkMode']);
-const emit = defineEmits(['update:activeCategory', 'update:activeTypeMode', 'select', 'create', 'openMenu', 'moveCat', 'saveOrder', 'updateCatColor', 'openTrash', 'openUserCenter', 'openImportCenter', 'toggleSort', 'toggleDarkMode', 'requestBulkDelete']);
+// 将原先的 'moveCat' 替换为更强大的 'reorderCat'
+const emit = defineEmits(['update:activeCategory', 'update:activeTypeMode', 'select', 'create', 'openMenu', 'reorderCat', 'saveOrder', 'updateCatColor', 'openTrash', 'openUserCenter', 'openImportCenter', 'toggleSort', 'toggleDarkMode', 'requestBulkDelete']);
 
 const showOrderModal = ref(false);
 const closeOrderModal = () => { showOrderModal.value = false; emit('saveOrder'); };
 
+// ================== SortableJS 拖拽引擎 ==================
+const sortableContainer = ref(null);
+let sortableInstance = null;
+
+// 监听 Modal 打开时，初始化拖拽引擎
+watch(showOrderModal, async (newVal) => {
+  if (newVal) {
+    await nextTick(); // 确保 DOM 已渲染
+    if (sortableContainer.value) {
+      sortableInstance = Sortable.create(sortableContainer.value, {
+        animation: 250, // 丝滑过渡动画
+        delay: 200, // 移动端长按 200ms 后才触发拖拽 (防止与滑动冲突)
+        delayOnTouchOnly: true, // 仅触摸屏需要长按，电脑鼠标即点即拖
+        ghostClass: 'opacity-40', // 拖出位置的残影
+        dragClass: 'scale-105', // 抓起时的放大效果
+        onEnd: (evt) => {
+          if (evt.oldIndex !== evt.newIndex) {
+            emit('reorderCat', evt.oldIndex, evt.newIndex);
+          }
+        }
+      });
+    }
+  } else {
+    // 关闭时清理引擎
+    if (sortableInstance) {
+      sortableInstance.destroy();
+      sortableInstance = null;
+    }
+  }
+});
+
+// ================== 其他逻辑保持不变 ==================
 const isBulkMode = ref(false);
 const selectedIds = ref([]);
 const isAllSelected = computed(() => props.sortedList.length > 0 && selectedIds.value.length === props.sortedList.length);
@@ -143,17 +176,8 @@ const startPress = (item) => { if (isBulkMode.value) return; isLongPress = false
 const cancelPress = () => { if (pressTimer) clearTimeout(pressTimer); };
 const handleClick = (item) => { if (isBulkMode.value) { const idx = selectedIds.value.indexOf(item.id); if (idx > -1) selectedIds.value.splice(idx, 1); else selectedIds.value.push(item.id); return; } if (!isLongPress) emit('select', item); };
 
-// 标签深色适配
-const getNavStyle = (cat, isActive) => { 
-  const color = props.customCatColors[cat]; 
-  if (isActive) return { backgroundColor: color || '#2563eb', color: '#ffffff', borderColor: color || '#2563eb' }; 
-  return { backgroundColor: props.isDarkMode ? '#1f2937' : '#ffffff', color: color || (props.isDarkMode ? '#e5e7eb' : '#4b5563'), borderColor: color || (props.isDarkMode ? '#374151' : '#e5e7eb') }; 
-};
-const getBubbleStyle = (cat) => { 
-  const color = props.customCatColors[cat]; 
-  if (color) return { backgroundColor: color + '26', color: color, borderColor: color }; 
-  return { backgroundColor: props.isDarkMode ? '#374151' : '#f3f4f6', color: props.isDarkMode ? '#d1d5db' : '#6b7280', borderColor: 'transparent' }; 
-};
+const getNavStyle = (cat, isActive) => { const color = props.customCatColors[cat]; if (isActive) return { backgroundColor: color || '#2563eb', color: '#ffffff', borderColor: color || '#2563eb' }; return { backgroundColor: props.isDarkMode ? '#1f2937' : '#ffffff', color: color || (props.isDarkMode ? '#e5e7eb' : '#4b5563'), borderColor: color || (props.isDarkMode ? '#374151' : '#e5e7eb') }; };
+const getBubbleStyle = (cat) => { const color = props.customCatColors[cat]; if (color) return { backgroundColor: color + '26', color: color, borderColor: color }; return { backgroundColor: props.isDarkMode ? '#374151' : '#f3f4f6', color: props.isDarkMode ? '#d1d5db' : '#6b7280', borderColor: 'transparent' }; };
 const getTypeBadgeClass = (type) => { switch(type) { case 'interview': return 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400'; case 'diary': return 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'; case 'journal': return 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400'; default: return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'; } };
 const getTypeName = (type) => { switch(type) { case 'interview': return '面经'; case 'diary': return '日记'; case 'journal': return '手账'; default: return '算法'; } };
 const getCardBorderClass = (type) => { switch(type) { case 'interview': return 'border-purple-400 dark:border-purple-600'; case 'diary': return 'border-green-400 dark:border-green-600'; case 'journal': return 'border-orange-400 dark:border-orange-600'; default: return 'border-blue-400 dark:border-blue-600'; } };

@@ -4,14 +4,14 @@
     <HomeView 
       ref="homeViewRef" v-if="!selectedAlgo && !isEditing"
       :appSpace="appSpace" :activeTypeMode="activeTypeMode" @update:activeTypeMode="handleModeChange"
-      :categories="activeModeCategories" :globalCategories="customCatOrder" 
+      :categories="activeModeCategories" :globalCategories="customCatOrder[appSpace]" 
       :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
       :getCategories="getCategories" :difficultyColor="difficultyColor" :customCatColors="customCatColors"
       :sortMode="sortMode" :isDarkMode="isDarkMode" 
       @toggleSort="toggleSort" @toggleDarkMode="toggleDarkMode" @requestBulkDelete="handleBulkDeleteRequest"
       @update:activeCategory="activeCategory = $event"
       @select="startView" @create="createNew" @openMenu="openActionMenu"
-      @moveCat="moveCategory" @saveOrder="saveToDisk" @updateCatColor="updateCatColor"
+      @reorderCat="reorderCategory" @saveOrder="saveToDisk" @updateCatColor="updateCatColor"
       @openTrash="showTrashModal = true" @openUserCenter="showUserCenter = true"
       @openImportCenter="showImportModal = true"
     />
@@ -58,7 +58,6 @@
 
       <div class="flex-1 flex overflow-hidden relative">
         <FloatingNav v-if="!isEditing" :hasPrev="hasPrev" :hasNext="hasNext" @prev="goPrev" @next="goNext" />
-        
         <TocPanel :show="isTocOpen && !isEditing && selectedAlgo?.type !== 'algorithm'" :form="selectedAlgo" @close="isTocOpen = false" :contentFontSize="contentFontSize" />
         <DiaryView v-if="['diary', 'journal'].includes(isEditing ? editForm.type : selectedAlgo?.type)" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
         <InterviewView v-else-if="(isEditing ? editForm.type : selectedAlgo?.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
@@ -76,13 +75,15 @@
     </div>
 
     <ActionMenuModal :show="showActionMenu" :item="actionItem" @close="showActionMenu = false" @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete" @shareData="handleShareData" />
-    <TrashModal :show="showTrashModal" :trashList="trashList" @close="showTrashModal = false" @restore="restoreItem" @requestPermDelete="handlePermDeleteRequest" @requestEmpty="handleEmptyTrashRequest" />
+    
+    <TrashModal :show="showTrashModal" :trashList="currentSpaceTrashList" @close="showTrashModal = false" @restore="restoreItem" @requestPermDelete="handlePermDeleteRequest" @requestEmpty="handleEmptyTrashRequest" />
+    
     <UserCenterModal :show="showUserCenter" :appSpace="appSpace" :defaultAppSpace="defaultAppSpace" :algoCount="algoCount" :interviewCount="interviewCount" :diaryCount="diaryCount" :journalCount="journalCount" @close="showUserCenter = false" @toggleAppSpace="toggleAppSpace" @toggleDefaultSpace="toggleDefaultSpace" @exportData="handleExportData" />
     <ImportSyncModal :show="showImportModal" :isSyncing="isSyncing" :savedGithubUrl="savedGithubUrl" @close="showImportModal = false" @syncGithub="handleGithubSync" @syncMarkdown="handleMarkdownImport" @syncClipboard="handleClipboardImport" />
 
     <div v-if="showDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col"><h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">移入回收站</h3><p class="text-gray-500 dark:text-gray-400 mb-6">确定将 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ itemToDelete?.title }}"</span> 移入回收站？</p><div class="flex justify-end space-x-3"><button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button><button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">确定</button></div></div></div>
     <div v-if="showBulkDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col"><h3 class="text-xl font-bold dark:text-red-400 text-red-600 mb-2">批量移入回收站</h3><p class="text-gray-500 dark:text-gray-400 mb-6">确定要将选中的 <span class="font-bold text-red-500 text-lg mx-1">{{ pendingBulkIds.length }}</span> 项移入回收站吗？</p><div class="flex justify-end space-x-3"><button @click="showBulkDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button><button @click="confirmBulkDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">全部移动</button></div></div></div>
-    <div v-if="showEmptyTrashConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[26rem] flex flex-col border-t-8 border-red-500"><h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">⚠️ 危险操作：彻底清空</h3><p class="text-gray-600 dark:text-gray-400 mb-6">彻底清空回收站后，<span class="font-bold text-black dark:text-white">所有数据将永远无法找回</span>。确认清空吗？</p><div class="flex justify-end space-x-3"><button @click="showEmptyTrashConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">保留数据</button><button @click="confirmEmptyTrash" class="px-5 py-2 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 shadow-md">确认彻底清空</button></div></div></div>
+    <div v-if="showEmptyTrashConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[26rem] flex flex-col border-t-8 border-red-500"><h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">⚠️ 危险操作：彻底清空</h3><p class="text-gray-600 dark:text-gray-400 mb-6">彻底清空回收站后，<span class="font-bold text-black dark:text-white">当前空间内的回收数据将永远无法找回</span>。确认清空吗？</p><div class="flex justify-end space-x-3"><button @click="showEmptyTrashConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">保留数据</button><button @click="confirmEmptyTrash" class="px-5 py-2 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 shadow-md">确认彻底清空</button></div></div></div>
     <div v-if="showPermDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"><div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col"><h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">彻底删除</h3><p class="text-gray-500 dark:text-gray-400 mb-6">彻底删除 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ pendingPermItem?.title }}"</span> 将无法找回，确认？</p><div class="flex justify-end space-x-3"><button @click="showPermDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button><button @click="confirmPermDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">彻底删除</button></div></div></div>
   </div>
 </template>
@@ -94,8 +95,6 @@ import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Clipboard } from '@capacitor/clipboard';
 import localforage from 'localforage';
-
-// 引入解耦后的同步引擎组件
 import { useSyncEngine } from './composables/useSyncEngine';
 
 import HomeView from './components/HomeView.vue';
@@ -104,7 +103,6 @@ import InterviewView from './components/InterviewView.vue';
 import DiaryView from './components/DiaryView.vue'; 
 import FloatingNav from './components/FloatingNav.vue'; 
 import TocPanel from './components/TocPanel.vue'; 
-
 import ActionMenuModal from './components/ActionMenuModal.vue';
 import TrashModal from './components/TrashModal.vue';
 import UserCenterModal from './components/UserCenterModal.vue';
@@ -127,11 +125,10 @@ const contentFontSize = ref(18);
 
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
-const customCatOrder = ref([]); 
+const customCatOrder = ref({ tech: [], life: [] }); 
 const customCatColors = ref({}); 
 const editForm = ref({ id: '', title: '', category: '', type: 'algorithm', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false });
 
-// ================== 2. 弹窗控制状态 ==================
 const showDeleteConfirm = ref(false);
 const showTrashModal = ref(false);
 const showUserCenter = ref(false); 
@@ -146,9 +143,18 @@ const showEmptyTrashConfirm = ref(false);
 const showPermDeleteConfirm = ref(false);
 const pendingPermItem = ref(null);
 
-// ================== 3. 底层辅助与本地保存引擎 ==================
 const getCategories = (catStr) => { if (!catStr) return ['未分类']; const cats = catStr.split(/[\s,，]+/).filter(Boolean); return cats.length > 0 ? cats : ['未分类']; };
-const extractAndSyncCategories = () => { const allCats = new Set(algorithms.value.flatMap(a => getCategories(a.category))); const ordered = customCatOrder.value.filter(c => allCats.has(c)); const unordered = Array.from(allCats).filter(c => !ordered.includes(c)); customCatOrder.value = [...ordered, ...unordered]; };
+const extractAndSyncCategories = () => { 
+  ['tech', 'life'].forEach(space => {
+    const types = space === 'tech' ? ['algorithm', 'interview'] : ['diary', 'journal'];
+    const items = algorithms.value.filter(a => types.includes(a.type));
+    const allCats = new Set(items.flatMap(a => getCategories(a.category))); 
+    const currentOrder = customCatOrder.value[space] || [];
+    const ordered = currentOrder.filter(c => allCats.has(c)); 
+    const unordered = Array.from(allCats).filter(c => !ordered.includes(c)); 
+    customCatOrder.value[space] = [...ordered, ...unordered]; 
+  });
+};
 
 const saveToDisk = async () => {
   try {
@@ -161,36 +167,19 @@ const saveToDisk = async () => {
   } catch (e) { console.error(e); }
 };
 
-// ================== 4. 挂载抽离出的同步与导入功能 ==================
-const { 
-  isSyncing, savedGithubUrl, handleGithubSync, 
-  handleMarkdownImport, handleClipboardImport, handleExportData 
-} = useSyncEngine({ algorithms, trashList, extractAndSyncCategories, saveToDisk, appSpace, showImportModal });
+const { isSyncing, savedGithubUrl, handleGithubSync, handleMarkdownImport, handleClipboardImport, handleExportData } = useSyncEngine({ algorithms, trashList, extractAndSyncCategories, saveToDisk, appSpace, showImportModal });
 
-// ================== 5. 全局基础功能 (模式/主题/字号) ==================
 const increaseFontSize = async () => { if (contentFontSize.value < 32) contentFontSize.value += 2; await localforage.setItem('font-size', contentFontSize.value); };
 const decreaseFontSize = async () => { if (contentFontSize.value > 12) contentFontSize.value -= 2; await localforage.setItem('font-size', contentFontSize.value); };
-
-const toggleDarkMode = async () => {
-  isDarkMode.value = !isDarkMode.value;
-  if (isDarkMode.value) document.documentElement.classList.add('dark');
-  else document.documentElement.classList.remove('dark');
-  await localforage.setItem('dark-mode', isDarkMode.value);
-};
-
-const toggleToc = async () => {
-  isTocOpen.value = !isTocOpen.value;
-  await localforage.setItem('toc-open', isTocOpen.value);
-};
-
+const toggleDarkMode = async () => { isDarkMode.value = !isDarkMode.value; if (isDarkMode.value) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); await localforage.setItem('dark-mode', isDarkMode.value); };
+const toggleToc = async () => { isTocOpen.value = !isTocOpen.value; await localforage.setItem('toc-open', isTocOpen.value); };
 const handleModeChange = (mode) => { activeTypeMode.value = mode; activeCategory.value = '全部'; };
 const toggleAppSpace = () => { appSpace.value = appSpace.value === 'tech' ? 'life' : 'tech'; activeTypeMode.value = 'all'; activeCategory.value = '全部'; showUserCenter.value = false; };
 const toggleDefaultSpace = async () => { defaultAppSpace.value = defaultAppSpace.value === 'tech' ? 'life' : 'tech'; await localforage.setItem('default-app-space', defaultAppSpace.value); };
 const toggleSort = async () => { sortMode.value = sortMode.value === 'time' ? 'title' : 'time'; await localforage.setItem('sort-mode', sortMode.value); };
 const updateCatColor = async (cat, color) => { customCatColors.value[cat] = color; await saveToDisk(); };
-const moveCategory = (index, direction) => { const targetIndex = index + direction; if (targetIndex < 0 || targetIndex >= customCatOrder.value.length) return; const temp = customCatOrder.value[index]; customCatOrder.value[index] = customCatOrder.value[targetIndex]; customCatOrder.value[targetIndex] = temp; };
+const reorderCategory = async (oldIndex, newIndex) => { const spaceOrder = customCatOrder.value[appSpace.value]; const item = spaceOrder.splice(oldIndex, 1)[0]; spaceOrder.splice(newIndex, 0, item); await saveToDisk(); };
 
-// ================== 6. 批量操作与回收站管理 ==================
 const handleBulkDeleteRequest = (ids) => { pendingBulkIds.value = ids; showBulkDeleteConfirm.value = true; };
 const confirmBulkDelete = async () => {
   const itemsToDelete = algorithms.value.filter(a => pendingBulkIds.value.includes(a.id));
@@ -199,56 +188,50 @@ const confirmBulkDelete = async () => {
   showBulkDeleteConfirm.value = false; homeViewRef.value?.exitBulkMode();
 };
 
+// ================== 核心修复：回收站的空间严格隔离 ==================
+// 1. 计算出属于当前空间的回收站列表，供界面渲染
+const currentSpaceTrashList = computed(() => {
+  const types = appSpace.value === 'tech' ? ['algorithm', 'interview'] : ['diary', 'journal'];
+  return trashList.value.filter(item => types.includes(item?.type));
+});
+
 const handleEmptyTrashRequest = () => { showEmptyTrashConfirm.value = true; };
-const confirmEmptyTrash = async () => { trashList.value = []; await saveToDisk(); showEmptyTrashConfirm.value = false; };
+
+// 2. 一键清空时，【保留】不属于当前空间的垃圾，仅销毁本空间的垃圾
+const confirmEmptyTrash = async () => { 
+  const currentTypes = appSpace.value === 'tech' ? ['algorithm', 'interview'] : ['diary', 'journal'];
+  // 过滤出那些 "不在当前类型列表" 里的数据（即保留另一个隐藏空间的数据）
+  trashList.value = trashList.value.filter(item => !currentTypes.includes(item?.type)); 
+  await saveToDisk(); 
+  showEmptyTrashConfirm.value = false; 
+};
 
 const handlePermDeleteRequest = (item) => { pendingPermItem.value = item; showPermDeleteConfirm.value = true; };
 const confirmPermDelete = async () => { trashList.value = trashList.value.filter(a => a.id !== pendingPermItem.value.id); await saveToDisk(); showPermDeleteConfirm.value = false; };
-
 const restoreItem = async (item) => { trashList.value = trashList.value.filter(a => a.id !== item.id); algorithms.value.unshift(item); extractAndSyncCategories(); await saveToDisk(); };
 const triggerDelete = (item) => { itemToDelete.value = item; showDeleteConfirm.value = true; };
 const confirmDelete = async () => { const item = itemToDelete.value; algorithms.value = algorithms.value.filter(a => a.id !== item.id); trashList.value.unshift(item); showDeleteConfirm.value = false; extractAndSyncCategories(); await saveToDisk(); if (selectedAlgo.value?.id === item.id) goBack(); };
 
-// ================== 7. 视图导航与内容操作 ==================
 const openActionMenu = (item) => { actionItem.value = item; showActionMenu.value = true; };
 const togglePin = async (item) => { const idx = algorithms.value.findIndex(a => a.id === item.id); if (idx !== -1) { algorithms.value[idx].isPinned = !algorithms.value[idx].isPinned; showActionMenu.value = false; await saveToDisk(); } };
 const handleMenuEdit = (item) => { showActionMenu.value = false; selectedAlgo.value = item; startEdit(); };
 const handleMenuDelete = (item) => { showActionMenu.value = false; triggerDelete(item); };
-
-const handleShareData = async (item) => { 
-  try { 
-    await Clipboard.write({ string: JSON.stringify({ lcp_version: "1.0", type: item.type || "algorithm", metadata: { id: item.id || Date.now().toString(), title: item.title, category: item.category, isPinned: !!item.isPinned }, payload: { difficulty: item.difficulty, language: item.language, problemText: item.problemText, solutionText: item.solutionText }, assets: item.images || {} }) }); 
-    showActionMenu.value = false; 
-    alert("📦 数据包已复制！可供其他设备一键导入。"); 
-  } catch (e) { console.error(e); } 
-};
+const handleShareData = async (item) => { try { await Clipboard.write({ string: JSON.stringify({ lcp_version: "1.0", type: item.type || "algorithm", metadata: { id: item.id || Date.now().toString(), title: item.title, category: item.category, isPinned: !!item.isPinned }, payload: { difficulty: item.difficulty, language: item.language, problemText: item.problemText, solutionText: item.solutionText }, assets: item.images || {} }) }); showActionMenu.value = false; alert("📦 数据包已复制！可供其他设备一键导入。"); } catch (e) { console.error(e); } };
 
 const startView = (item) => { selectedAlgo.value = item; isEditing.value = false; };
 const createNew = () => { editForm.value = { id: Date.now().toString(), title: '', category: '', type: appSpace.value === 'tech' ? 'algorithm' : 'diary', difficulty: '中等', language: 'python', problemText: '', solutionText: '', images: {}, isPinned: false }; selectedAlgo.value = null; isEditing.value = true; };
 const startEdit = () => { editForm.value = JSON.parse(JSON.stringify(selectedAlgo.value)); if (!editForm.value.images) editForm.value.images = {}; if (!editForm.value.type) editForm.value.type = appSpace.value === 'tech' ? 'algorithm' : 'diary'; isEditing.value = true; };
-
-const saveAlgo = async () => {
-  if (!editForm.value.title) return alert("标题不能为空！");
-  const newItem = JSON.parse(JSON.stringify(editForm.value));
-  const index = algorithms.value.findIndex(a => a.id === newItem.id);
-  if (index >= 0) algorithms.value[index] = newItem; else algorithms.value.unshift(newItem);
-  extractAndSyncCategories(); 
-  selectedAlgo.value = algorithms.value.find(a => a.id === newItem.id);
-  isEditing.value = false;
-  await saveToDisk();
-};
-
+const saveAlgo = async () => { if (!editForm.value.title) return alert("标题不能为空！"); const newItem = JSON.parse(JSON.stringify(editForm.value)); const index = algorithms.value.findIndex(a => a.id === newItem.id); if (index >= 0) algorithms.value[index] = newItem; else algorithms.value.unshift(newItem); extractAndSyncCategories(); selectedAlgo.value = algorithms.value.find(a => a.id === newItem.id); isEditing.value = false; await saveToDisk(); };
 const goBack = () => { selectedAlgo.value = null; isEditing.value = false; };
 const goPrev = () => { if (hasPrev.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value - 1]; }; 
 const goNext = () => { if (hasNext.value) selectedAlgo.value = sortedFilteredAlgorithms.value[currentIndex.value + 1]; };
 
-// ================== 8. 计算属性 ==================
 const algoCount = computed(() => algorithms.value.filter(a => a.type === 'algorithm').length);
 const interviewCount = computed(() => algorithms.value.filter(a => a.type === 'interview').length);
 const diaryCount = computed(() => algorithms.value.filter(a => a.type === 'diary').length);
 const journalCount = computed(() => algorithms.value.filter(a => a.type === 'journal').length);
 
-const activeModeCategories = computed(() => { let listForCats = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type)); if (activeTypeMode.value !== 'all') listForCats = listForCats.filter(a => a.type === activeTypeMode.value); const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category))); const displayCats = customCatOrder.value.filter(c => currentModeCats.has(c)); return ['全部', ...displayCats]; });
+const activeModeCategories = computed(() => { let listForCats = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type)); if (activeTypeMode.value !== 'all') listForCats = listForCats.filter(a => a.type === activeTypeMode.value); const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category))); const displayCats = (customCatOrder.value[appSpace.value] || []).filter(c => currentModeCats.has(c)); return ['全部', ...displayCats]; });
 const sortedFilteredAlgorithms = computed(() => {
   let list = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type));
   if (activeTypeMode.value !== 'all') list = list.filter(a => a.type === activeTypeMode.value);
@@ -267,16 +250,17 @@ const currentIndex = computed(() => !selectedAlgo.value ? -1 : sortedFilteredAlg
 const hasPrev = computed(() => currentIndex.value > 0); 
 const hasNext = computed(() => currentIndex.value !== -1 && currentIndex.value < sortedFilteredAlgorithms.value.length - 1);
 
-// ================== 9. 初始化与生命周期 ==================
 const loadData = async () => {
   try {
     const savedUrl = await localforage.getItem('github-sync-url'); if (savedUrl) savedGithubUrl.value = savedUrl;
-    const savedOrder = await localforage.getItem('cat-order'); if (savedOrder) customCatOrder.value = savedOrder;
     const savedColors = await localforage.getItem('cat-colors'); if (savedColors) customCatColors.value = savedColors;
     const savedTrash = await localforage.getItem('algo-trash'); if (savedTrash) trashList.value = savedTrash;
     const savedSortMode = await localforage.getItem('sort-mode'); if (savedSortMode) sortMode.value = savedSortMode;
     const savedDefaultSpace = await localforage.getItem('default-app-space'); if (savedDefaultSpace) { defaultAppSpace.value = savedDefaultSpace; appSpace.value = savedDefaultSpace; }
     
+    const savedOrder = await localforage.getItem('cat-order'); 
+    if (savedOrder) { if (Array.isArray(savedOrder)) { customCatOrder.value = { tech: [...savedOrder], life: [...savedOrder] }; } else { customCatOrder.value = savedOrder; } }
+
     const savedDarkMode = await localforage.getItem('dark-mode'); 
     if (savedDarkMode) { isDarkMode.value = savedDarkMode; if(isDarkMode.value) document.documentElement.classList.add('dark'); }
     const savedTocOpen = await localforage.getItem('toc-open'); if (savedTocOpen !== null) isTocOpen.value = savedTocOpen;
