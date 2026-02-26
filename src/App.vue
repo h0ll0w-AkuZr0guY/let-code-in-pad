@@ -7,7 +7,7 @@
       :categories="activeModeCategories" :globalCategories="customCatOrder" 
       :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
       :getCategories="getCategories" :difficultyColor="difficultyColor" :customCatColors="customCatColors"
-      :sortMode="sortMode" :isDarkMode="isDarkMode"
+      :sortMode="sortMode" :isDarkMode="isDarkMode" 
       @toggleSort="toggleSort" @toggleDarkMode="toggleDarkMode" @requestBulkDelete="handleBulkDeleteRequest"
       @update:activeCategory="activeCategory = $event"
       @select="startView" @create="createNew" @openMenu="openActionMenu"
@@ -41,7 +41,7 @@
               </template>
             </div>
             <button @click="saveAlgo" class="text-white px-6 py-2 rounded-lg font-bold ml-4 shrink-0 shadow-md"
-                    :class="appSpace === 'tech' ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600' : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600'">保存更改</button>
+                    :class="appSpace === 'tech' ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-700' : 'bg-green-600 hover:bg-green-700 dark:bg-green-700'">保存更改</button>
           </template>
 
           <template v-else>
@@ -58,17 +58,31 @@
 
       <div class="flex-1 flex overflow-hidden relative">
         <FloatingNav v-if="!isEditing" :hasPrev="hasPrev" :hasNext="hasNext" @prev="goPrev" @next="goNext" />
+        
+        <TocPanel :show="isTocOpen && !isEditing && selectedAlgo?.type !== 'algorithm'" :form="selectedAlgo" @close="isTocOpen = false" />
+
         <DiaryView v-if="['diary', 'journal'].includes(isEditing ? editForm.type : selectedAlgo?.type)" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
         <InterviewView v-else-if="(isEditing ? editForm.type : selectedAlgo?.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
         <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
       </div>
 
-      <button v-if="selectedAlgo || isEditing" @click="toggleDarkMode" class="fixed bottom-8 right-8 w-14 h-14 bg-gray-800 dark:bg-gray-100 text-yellow-300 dark:text-gray-800 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all z-[100] group border dark:border-transparent border-gray-700">
-        {{ isDarkMode ? '☀️' : '🌙' }}
-        <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
-          {{ isDarkMode ? '切换浅色模式' : '切换深色模式' }}
-        </span>
-      </button>
+      <div v-if="selectedAlgo && !isEditing" class="fixed bottom-8 right-8 flex flex-col space-y-4 z-[100]">
+        
+        <button v-if="selectedAlgo.type !== 'algorithm'" @click="toggleToc" class="w-14 h-14 bg-white dark:bg-gray-800 text-blue-500 dark:text-blue-400 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all group border dark:border-gray-700 border-gray-200">
+          📑
+          <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
+            {{ isTocOpen ? '关闭目录' : '打开目录' }}
+          </span>
+        </button>
+
+        <button @click="toggleDarkMode" class="w-14 h-14 bg-gray-800 dark:bg-gray-100 text-yellow-300 dark:text-gray-800 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all group border dark:border-transparent border-gray-700">
+          {{ isDarkMode ? '☀️' : '🌙' }}
+          <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
+            {{ isDarkMode ? '切换浅色模式' : '切换深色模式' }}
+          </span>
+        </button>
+
+      </div>
     </div>
 
     <ActionMenuModal :show="showActionMenu" :item="actionItem" @close="showActionMenu = false" @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete" @shareData="handleShareData" />
@@ -76,23 +90,23 @@
     <UserCenterModal :show="showUserCenter" :appSpace="appSpace" :defaultAppSpace="defaultAppSpace" :algoCount="algoCount" :interviewCount="interviewCount" :diaryCount="diaryCount" :journalCount="journalCount" @close="showUserCenter = false" @toggleAppSpace="toggleAppSpace" @toggleDefaultSpace="toggleDefaultSpace" @exportData="handleExportData" />
     <ImportSyncModal :show="showImportModal" :isSyncing="isSyncing" :savedGithubUrl="savedGithubUrl" @close="showImportModal = false" @syncGithub="handleGithubSync" @syncMarkdown="handleMarkdownImport" @syncClipboard="handleClipboardImport" />
 
-    <div v-if="showDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm transition-opacity">
+    <div v-if="showDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
       <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
         <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">移入回收站</h3>
         <p class="text-gray-500 dark:text-gray-400 mb-6">确定将 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ itemToDelete?.title }}"</span> 移入回收站？</p>
         <div class="flex justify-end space-x-3">
-          <button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">取消</button>
-          <button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">确定移动</button>
+          <button @click="showDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button>
+          <button @click="confirmDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">确定</button>
         </div>
       </div>
     </div>
-
+    
     <div v-if="showBulkDeleteConfirm" class="absolute inset-0 z-max flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
       <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-[24rem] flex flex-col">
         <h3 class="text-xl font-bold dark:text-red-400 text-red-600 mb-2">批量移入回收站</h3>
         <p class="text-gray-500 dark:text-gray-400 mb-6">确定要将选中的 <span class="font-bold text-red-500 text-lg mx-1">{{ pendingBulkIds.length }}</span> 项移入回收站吗？</p>
         <div class="flex justify-end space-x-3">
-          <button @click="showBulkDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">取消操作</button>
+          <button @click="showBulkDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button>
           <button @click="confirmBulkDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">全部移动</button>
         </div>
       </div>
@@ -103,7 +117,7 @@
         <h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">⚠️ 危险操作：彻底清空</h3>
         <p class="text-gray-600 dark:text-gray-400 mb-6">彻底清空回收站后，<span class="font-bold text-black dark:text-white">所有数据将永远无法找回</span>。确认清空吗？</p>
         <div class="flex justify-end space-x-3">
-          <button @click="showEmptyTrashConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">保留数据</button>
+          <button @click="showEmptyTrashConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">保留数据</button>
           <button @click="confirmEmptyTrash" class="px-5 py-2 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 shadow-md">确认彻底清空</button>
         </div>
       </div>
@@ -114,11 +128,12 @@
         <h3 class="text-xl font-bold text-red-600 dark:text-red-400 mb-2">彻底删除</h3>
         <p class="text-gray-500 dark:text-gray-400 mb-6">彻底删除 <span class="font-bold text-gray-700 dark:text-gray-200">"{{ pendingPermItem?.title }}"</span> 将无法找回，确认？</p>
         <div class="flex justify-end space-x-3">
-          <button @click="showPermDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">取消</button>
+          <button @click="showPermDeleteConfirm = false" class="px-5 py-2 rounded-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200">取消</button>
           <button @click="confirmPermDelete" class="px-5 py-2 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-md">彻底删除</button>
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -136,6 +151,7 @@ import AlgoView from './components/AlgoView.vue';
 import InterviewView from './components/InterviewView.vue';
 import DiaryView from './components/DiaryView.vue'; 
 import FloatingNav from './components/FloatingNav.vue'; 
+import TocPanel from './components/TocPanel.vue'; // 确保目录组件被引入
 
 import ActionMenuModal from './components/ActionMenuModal.vue';
 import TrashModal from './components/TrashModal.vue';
@@ -151,7 +167,10 @@ const appSpace = ref('tech');
 const defaultAppSpace = ref('tech');
 const activeTypeMode = ref('all'); 
 const sortMode = ref('time'); 
+
+// === 核心状态 ===
 const isDarkMode = ref(false); 
+const isTocOpen = ref(false); // 目录开关闭状态
 
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
@@ -284,6 +303,12 @@ const toggleDarkMode = async () => {
   await localforage.setItem('dark-mode', isDarkMode.value);
 };
 
+// 【新增切换事件】
+const toggleToc = async () => {
+  isTocOpen.value = !isTocOpen.value;
+  await localforage.setItem('toc-open', isTocOpen.value);
+};
+
 const resolveImagesForExport = (text, images = {}) => { if (!text) return ''; return text.replace(/\]\(local:([^)]+)\)/g, (match, imgId) => `](${images[imgId] || ''})`); };
 const inlineImagesForExport = async (text, images = {}) => {
   if (!text) return ''; let processedText = text; processedText = processedText.replace(/\]\(local:([^)]+)\)/g, (match, imgId) => `](${images[imgId] || ''})`);
@@ -317,16 +342,7 @@ const handleExportData = async (format, scope) => {
     } else if (format === 'pdf') {
       let htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>导出 PDF - Let Code in Pad</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-        <style>
-          body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; color: #333; max-width: 900px; margin: 0 auto;} 
-          h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 50px; page-break-after: avoid; } 
-          .meta { color: #888; font-size: 0.9em; margin-bottom: 20px; } 
-          pre { background: #f8f9fa; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; font-family: monospace; } 
-          img { max-width: 100%; border-radius: 8px; margin: 15px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } 
-          hr { border: none; border-top: 4px dashed #ddd; margin: 60px 0; } 
-          @media print { hr { page-break-after: always; border: none; margin: 0; } }
-          .katex-display { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.5rem; }
-        </style></head><body>`;
+        <style>body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; color: #333; max-width: 900px; margin: 0 auto;} h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 50px; page-break-after: avoid; } .meta { color: #888; font-size: 0.9em; margin-bottom: 20px; } pre { background: #f8f9fa; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; font-family: monospace; } img { max-width: 100%; border-radius: 8px; margin: 15px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } hr { border: none; border-top: 4px dashed #ddd; margin: 60px 0; } @media print { hr { page-break-after: always; border: none; margin: 0; } } .katex-display { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.5rem; }</style></head><body>`;
       for (const item of listToExport) {
         htmlContent += `<h1>${item.title}</h1><div class="meta">标签: ${item.category} | 类型: ${item.type}</div>`;
         let pText = await inlineImagesForExport(item.problemText, item.images); let sText = await inlineImagesForExport(item.solutionText, item.images);
@@ -362,8 +378,13 @@ const loadData = async () => {
     const savedTrash = await localforage.getItem('algo-trash'); if (savedTrash) trashList.value = savedTrash;
     const savedSortMode = await localforage.getItem('sort-mode'); if (savedSortMode) sortMode.value = savedSortMode;
     const savedDefaultSpace = await localforage.getItem('default-app-space'); if (savedDefaultSpace) { defaultAppSpace.value = savedDefaultSpace; appSpace.value = savedDefaultSpace; }
+    
     const savedDarkMode = await localforage.getItem('dark-mode'); 
     if (savedDarkMode) { isDarkMode.value = savedDarkMode; if(isDarkMode.value) document.documentElement.classList.add('dark'); }
+
+    // 【新增持久化】读取目录开关状态
+    const savedTocOpen = await localforage.getItem('toc-open');
+    if (savedTocOpen !== null) isTocOpen.value = savedTocOpen;
 
     let dataToUse = null; const isNative = Capacitor.isNativePlatform();
     if (isNative) { ScreenOrientation.lock({ orientation: 'landscape' }).catch(() => {}); const localData = await localforage.getItem('algo-data'); if (localData && localData.length > 0) dataToUse = localData; }

@@ -18,8 +18,22 @@ export const md = new MarkdownIt({
   }
 });
 
-// 【核心修复】：挂载新版 KaTeX，并关闭严格报错，防止个别语法错误导致整段白屏
+// 【核心修复】：挂载新版 KaTeX，并关闭严格报错
 md.use(markdownItKatex, { throwOnError: false, errorColor: '#cc0000' });
+
+// 【新增】：为 1~4 级标题动态生成 ID，用作目录锚点跳转
+md.renderer.rules.heading_open = function(tokens, idx, options, env, self) {
+  const token = tokens[idx];
+  let title = '';
+  // 提取标题纯文本内容
+  const inlineToken = tokens[idx + 1];
+  if (inlineToken && inlineToken.type === 'inline') {
+    title = inlineToken.content;
+  }
+  // 【终极修复】：剥离影响选择器解析的所有特殊符号与%，生成纯粹的字母数字组合
+  const slug = 'toc-' + encodeURIComponent(title.replace(/[*`_]/g, '').trim().toLowerCase().replace(/\s+/g, '-').substring(0, 30)).replace(/%/g, '');
+  return `<${token.tag} id="${slug}">`;
+};
 
 // 2. Turndown 配置 (富文本转 Markdown)
 export const turndownService = new TurndownService({
