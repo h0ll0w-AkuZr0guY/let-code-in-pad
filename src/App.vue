@@ -61,17 +61,22 @@
         
         <TocPanel :show="isTocOpen && !isEditing && selectedAlgo?.type !== 'algorithm'" :form="selectedAlgo" @close="isTocOpen = false" />
 
-        <DiaryView v-if="['diary', 'journal'].includes(isEditing ? editForm.type : selectedAlgo?.type)" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
-        <InterviewView v-else-if="(isEditing ? editForm.type : selectedAlgo?.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
-        <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" />
+        <DiaryView v-if="['diary', 'journal'].includes(isEditing ? editForm.type : selectedAlgo?.type)" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
+        <InterviewView v-else-if="(isEditing ? editForm.type : selectedAlgo?.type) === 'interview'" :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
+        <AlgoView v-else :form="isEditing ? editForm : selectedAlgo" :isEditing="isEditing" :contentFontSize="contentFontSize" />
       </div>
 
       <div v-if="selectedAlgo && !isEditing" class="fixed bottom-8 right-8 flex flex-col space-y-4 z-[100]">
         
+        <div class="flex flex-col bg-white dark:bg-gray-800 rounded-full shadow-lg border dark:border-gray-700 border-gray-200 overflow-hidden group">
+          <button @click="increaseFontSize" class="w-14 h-10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition font-bold text-lg border-b border-gray-100 dark:border-gray-700" title="放大字号">A+</button>
+          <button @click="decreaseFontSize" class="w-14 h-10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition font-bold text-sm" title="缩小字号">A-</button>
+        </div>
+
         <button v-if="selectedAlgo.type !== 'algorithm'" @click="toggleToc" class="w-14 h-14 bg-white dark:bg-gray-800 text-blue-500 dark:text-blue-400 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all group border dark:border-gray-700 border-gray-200">
           📑
           <span class="absolute right-16 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition pointer-events-none shadow-md">
-            {{ isTocOpen ? '关闭目录' : '打开目录' }}
+            {{ isTocOpen ? '关闭侧边目录' : '打开侧边目录' }}
           </span>
         </button>
 
@@ -151,7 +156,7 @@ import AlgoView from './components/AlgoView.vue';
 import InterviewView from './components/InterviewView.vue';
 import DiaryView from './components/DiaryView.vue'; 
 import FloatingNav from './components/FloatingNav.vue'; 
-import TocPanel from './components/TocPanel.vue'; // 确保目录组件被引入
+import TocPanel from './components/TocPanel.vue'; 
 
 import ActionMenuModal from './components/ActionMenuModal.vue';
 import TrashModal from './components/TrashModal.vue';
@@ -170,7 +175,18 @@ const sortMode = ref('time');
 
 // === 核心状态 ===
 const isDarkMode = ref(false); 
-const isTocOpen = ref(false); // 目录开关闭状态
+const isTocOpen = ref(false); 
+const contentFontSize = ref(18); // 默认正文字号: 18px
+
+// 动态字号引擎
+const increaseFontSize = async () => {
+  if (contentFontSize.value < 32) contentFontSize.value += 2;
+  await localforage.setItem('font-size', contentFontSize.value);
+};
+const decreaseFontSize = async () => {
+  if (contentFontSize.value > 12) contentFontSize.value -= 2;
+  await localforage.setItem('font-size', contentFontSize.value);
+};
 
 const selectedAlgo = ref(null);
 const isEditing = ref(false);
@@ -302,8 +318,6 @@ const toggleDarkMode = async () => {
   else document.documentElement.classList.remove('dark');
   await localforage.setItem('dark-mode', isDarkMode.value);
 };
-
-// 【新增切换事件】
 const toggleToc = async () => {
   isTocOpen.value = !isTocOpen.value;
   await localforage.setItem('toc-open', isTocOpen.value);
@@ -382,9 +396,12 @@ const loadData = async () => {
     const savedDarkMode = await localforage.getItem('dark-mode'); 
     if (savedDarkMode) { isDarkMode.value = savedDarkMode; if(isDarkMode.value) document.documentElement.classList.add('dark'); }
 
-    // 【新增持久化】读取目录开关状态
     const savedTocOpen = await localforage.getItem('toc-open');
     if (savedTocOpen !== null) isTocOpen.value = savedTocOpen;
+
+    // 读取缓存的字号，应用于所有的内容组件
+    const savedFontSize = await localforage.getItem('font-size');
+    if (savedFontSize) contentFontSize.value = savedFontSize;
 
     let dataToUse = null; const isNative = Capacitor.isNativePlatform();
     if (isNative) { ScreenOrientation.lock({ orientation: 'landscape' }).catch(() => {}); const localData = await localforage.getItem('algo-data'); if (localData && localData.length > 0) dataToUse = localData; }
