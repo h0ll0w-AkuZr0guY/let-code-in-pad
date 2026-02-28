@@ -26,3 +26,7 @@ dist-ssr
 android
 markdowns
 build.py
+
+public/data.json
+public/images/
+public copy/

@@ -19,14 +19,12 @@ window.zoomCodeBlock = function(btn, dir) {
   const pre = btn.closest('.code-wrapper').querySelector('pre');
   let size = parseInt(pre.style.fontSize) || 15;
   size += dir * 2;
-  // 独立界限：最小10px，最大32px
   if (size >= 10 && size <= 32) pre.style.fontSize = size + 'px';
 };
 
 // ================== Markdown 引擎配置 ==================
 export const md = new MarkdownIt({ html: true, breaks: true });
 
-// 【核心魔改】：接管代码块渲染，注入 MacOS 风格顶栏和独立缩放按钮
 md.renderer.rules.fence = function (tokens, idx) {
   const token = tokens[idx];
   const code = token.content;
@@ -71,6 +69,16 @@ md.use(markdownItKatex, { throwOnError: false, errorColor: '#cc0000' });
 export const turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', emDelimiter: '*' });
 turndownService.escape = (string) => string;
 
+// 【新增防挤压规则】：强制还原网页中隐形的块级回车，杜绝文字挤成一团
+turndownService.addRule('div_block', {
+  filter: 'div',
+  replacement: function (content) { return '\n\n' + content + '\n\n'; }
+});
+turndownService.addRule('br_line', {
+  filter: 'br',
+  replacement: function () { return '\n'; }
+});
+
 export const renderMarkdown = (text, images = {}) => {
   if (!text) return '';
   return md.render(text.replace(/\]\(local:([^)]+)\)/g, (match, imgId) => `](${images[imgId] || ''})`));
@@ -84,7 +92,6 @@ export const renderSolution = (text, lang, images) => {
 };
 
 export const handleSmartPaste = (event, reactiveObj, targetField) => {
-  // 保持原有智能粘贴逻辑完全不变...
   const clipboardData = event.clipboardData || window.clipboardData;
   if (!clipboardData) return;
   const insertTextAtCursor = (textarea, textToInsert) => {
@@ -107,11 +114,14 @@ export const handleSmartPaste = (event, reactiveObj, targetField) => {
   const htmlData = clipboardData.getData('text/html'); const plainText = clipboardData.getData('text/plain');
   if (htmlData) {
     const isFromIDE = htmlData.includes('vscode') || htmlData.includes('monaco') || htmlData.includes('CodeMirror') || htmlData.includes('font-family: Consolas');
-    const isRichText = /<(h[1-6]|b|strong|em|i|a|p|ul|li|table|blockquote)[^>]*>/i.test(htmlData);
+    const isRichText = /<(h[1-6]|b|strong|em|i|a|p|ul|li|table|blockquote|img)[^>]*>/i.test(htmlData);
     if (isRichText && !isFromIDE && !plainText.match(/^```/)) {
       event.preventDefault(); let markdown = turndownService.turndown(htmlData);
-      markdown = markdown.replace(/(\*\*|\*)([\s\S]*?)\1([a-zA-Z0-9\u4e00-\u9fa5_])/g, (m, s, p1, p2) => `${s}${p1.replace(/\n+/g, ' ').trim()}${s} ${p2}`);
-      markdown = markdown.replace(/(\*\*|\*)([\s\S]*?)\1/g, (m, s, p1) => `${s}${p1.replace(/\n+/g, ' ').trim()}${s}`);
+      
+      // 【核心修复】：将正则表达式改为 [^\n]，严禁跨越换行符匹配！绝不会再吞噬正常段落的空白！
+      markdown = markdown.replace(/(\*\*|\*)([^\n]+?)\1([a-zA-Z0-9\u4e00-\u9fa5_])/g, (m, s, p1, p2) => `${s}${p1.trim()}${s} ${p2}`);
+      markdown = markdown.replace(/(\*\*|\*)([^\n]+?)\1/g, (m, s, p1) => `${s}${p1.trim()}${s}`);
+      
       insertTextAtCursor(event.target, markdown.replace(/\n{3,}/g, '\n\n'));
     }
   }
