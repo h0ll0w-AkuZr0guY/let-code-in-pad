@@ -87,7 +87,7 @@ watch(() => props.show, (newVal) => {
 
 // 【核心引流】：一键填充你的 GitHub Raw 地址并触发下载
 const fillAuthorData = () => {
-  githubUrl.value = 'https://raw.githubusercontent.com/h0ll0w-AkuZr0guY/let-code-in-pad/main/public';
+  githubUrl.value = 'https://raw.githubusercontent.com/h0ll0w-AkuZr0guY/lcp-data/main';
   emit('syncGithub', githubUrl.value);
 };
 
