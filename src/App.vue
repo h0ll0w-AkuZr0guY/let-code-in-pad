@@ -4,7 +4,8 @@
     <HomeView 
       ref="homeViewRef" v-if="!selectedAlgo && !isEditing"
       :appSpace="appSpace" :activeTypeMode="activeTypeMode" @update:activeTypeMode="handleModeChange"
-      :categories="activeModeCategories" :globalCategories="customCatOrder[appSpace]" 
+      :categories="activeModeCategories" 
+      :globalCategories="currentViewCategories" 
       :activeCategory="activeCategory" :sortedList="sortedFilteredAlgorithms"
       :getCategories="getCategories" :difficultyColor="difficultyColor" :customCatColors="customCatColors"
       :sortMode="sortMode" :isDarkMode="isDarkMode" 
@@ -75,9 +76,7 @@
     </div>
 
     <ActionMenuModal :show="showActionMenu" :item="actionItem" @close="showActionMenu = false" @pin="togglePin" @edit="handleMenuEdit" @delete="handleMenuDelete" @shareData="handleShareData" />
-    
     <TrashModal :show="showTrashModal" :trashList="currentSpaceTrashList" @close="showTrashModal = false" @restore="restoreItem" @requestPermDelete="handlePermDeleteRequest" @requestEmpty="handleEmptyTrashRequest" />
-    
     <UserCenterModal :show="showUserCenter" :appSpace="appSpace" :defaultAppSpace="defaultAppSpace" :algoCount="algoCount" :interviewCount="interviewCount" :diaryCount="diaryCount" :journalCount="journalCount" @close="showUserCenter = false" @toggleAppSpace="toggleAppSpace" @toggleDefaultSpace="toggleDefaultSpace" @exportData="handleExportData" />
     <ImportSyncModal :show="showImportModal" :isSyncing="isSyncing" :savedGithubUrl="savedGithubUrl" @close="showImportModal = false" @syncGithub="handleGithubSync" @syncMarkdown="handleMarkdownImport" @syncClipboard="handleClipboardImport" />
 
@@ -178,7 +177,59 @@ const toggleAppSpace = () => { appSpace.value = appSpace.value === 'tech' ? 'lif
 const toggleDefaultSpace = async () => { defaultAppSpace.value = defaultAppSpace.value === 'tech' ? 'life' : 'tech'; await localforage.setItem('default-app-space', defaultAppSpace.value); };
 const toggleSort = async () => { sortMode.value = sortMode.value === 'time' ? 'title' : 'time'; await localforage.setItem('sort-mode', sortMode.value); };
 const updateCatColor = async (cat, color) => { customCatColors.value[cat] = color; await saveToDisk(); };
-const reorderCategory = async (oldIndex, newIndex) => { const spaceOrder = customCatOrder.value[appSpace.value]; const item = spaceOrder.splice(oldIndex, 1)[0]; spaceOrder.splice(newIndex, 0, item); await saveToDisk(); };
+
+
+// ================== 核心修复区：精准映射的子列表拖拽引擎 ==================
+
+// 1. 专门为当前页面视图计算出最精准的“可见标签列表” (去除“全部”按钮)
+const currentViewCategories = computed(() => { 
+  let listForCats = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type)); 
+  if (activeTypeMode.value !== 'all') listForCats = listForCats.filter(a => a.type === activeTypeMode.value); 
+  const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category))); 
+  
+  return (customCatOrder.value[appSpace.value] || []).filter(c => currentModeCats.has(c)); 
+});
+
+// 2. 顶部滚动导航栏直接使用计算好的可见列表 (加上"全部"按钮)
+const activeModeCategories = computed(() => ['全部', ...currentViewCategories.value]);
+
+// 3. 超级拖拽映射引擎：将用户在“过滤后的弹窗列表”中的拖拽结果，完美无损地映射回底层的总列表！
+const reorderCategory = async (oldIndex, newIndex) => {
+  const subList = currentViewCategories.value;
+  if (!subList || subList.length === 0) return;
+  
+  const movedItem = subList[oldIndex];
+  let newSubList = [...subList];
+  newSubList.splice(oldIndex, 1);
+  newSubList.splice(newIndex, 0, movedItem); // 这是用户视觉上期望的新排列
+  
+  // 开始操作底层全局大列表
+  const globalList = customCatOrder.value[appSpace.value];
+  const globalOldIdx = globalList.indexOf(movedItem);
+  if (globalOldIdx === -1) return;
+  globalList.splice(globalOldIdx, 1); // 先把拖拽的元素抽出来
+  
+  // 寻找拖拽元素在“新子列表”中右侧相邻的兄弟元素
+  const itemAfter = newSubList[newIndex + 1];
+  if (itemAfter) {
+    // 把它插在右侧兄弟元素的前面
+    const insertIdx = globalList.indexOf(itemAfter);
+    globalList.splice(insertIdx !== -1 ? insertIdx : globalList.length, 0, movedItem);
+  } else {
+    // 如果它被拖到了最后（右侧没有兄弟了），就寻找左侧兄弟
+    const itemBefore = newSubList[newIndex - 1];
+    if (itemBefore) {
+      // 把它插在左侧兄弟元素的后面
+      const insertIdx = globalList.indexOf(itemBefore);
+      globalList.splice(insertIdx !== -1 ? insertIdx + 1 : globalList.length, 0, movedItem);
+    } else {
+      // 兜底：如果它孤身一人
+      globalList.push(movedItem);
+    }
+  }
+  await saveToDisk();
+};
+
 
 const handleBulkDeleteRequest = (ids) => { pendingBulkIds.value = ids; showBulkDeleteConfirm.value = true; };
 const confirmBulkDelete = async () => {
@@ -188,22 +239,15 @@ const confirmBulkDelete = async () => {
   showBulkDeleteConfirm.value = false; homeViewRef.value?.exitBulkMode();
 };
 
-// ================== 核心修复：回收站的空间严格隔离 ==================
-// 1. 计算出属于当前空间的回收站列表，供界面渲染
 const currentSpaceTrashList = computed(() => {
   const types = appSpace.value === 'tech' ? ['algorithm', 'interview'] : ['diary', 'journal'];
   return trashList.value.filter(item => types.includes(item?.type));
 });
-
 const handleEmptyTrashRequest = () => { showEmptyTrashConfirm.value = true; };
-
-// 2. 一键清空时，【保留】不属于当前空间的垃圾，仅销毁本空间的垃圾
 const confirmEmptyTrash = async () => { 
   const currentTypes = appSpace.value === 'tech' ? ['algorithm', 'interview'] : ['diary', 'journal'];
-  // 过滤出那些 "不在当前类型列表" 里的数据（即保留另一个隐藏空间的数据）
   trashList.value = trashList.value.filter(item => !currentTypes.includes(item?.type)); 
-  await saveToDisk(); 
-  showEmptyTrashConfirm.value = false; 
+  await saveToDisk(); showEmptyTrashConfirm.value = false; 
 };
 
 const handlePermDeleteRequest = (item) => { pendingPermItem.value = item; showPermDeleteConfirm.value = true; };
@@ -231,7 +275,6 @@ const interviewCount = computed(() => algorithms.value.filter(a => a.type === 'i
 const diaryCount = computed(() => algorithms.value.filter(a => a.type === 'diary').length);
 const journalCount = computed(() => algorithms.value.filter(a => a.type === 'journal').length);
 
-const activeModeCategories = computed(() => { let listForCats = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type)); if (activeTypeMode.value !== 'all') listForCats = listForCats.filter(a => a.type === activeTypeMode.value); const currentModeCats = new Set(listForCats.flatMap(a => getCategories(a.category))); const displayCats = (customCatOrder.value[appSpace.value] || []).filter(c => currentModeCats.has(c)); return ['全部', ...displayCats]; });
 const sortedFilteredAlgorithms = computed(() => {
   let list = algorithms.value.filter(a => appSpace.value === 'tech' ? ['algorithm', 'interview'].includes(a.type) : ['diary', 'journal'].includes(a.type));
   if (activeTypeMode.value !== 'all') list = list.filter(a => a.type === activeTypeMode.value);
