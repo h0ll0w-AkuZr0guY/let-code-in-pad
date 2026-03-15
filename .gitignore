@@ -30,4 +30,5 @@ build.py
 public/data.json
 public/images/
 
-public
+public/
+public copy/
